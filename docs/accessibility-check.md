@@ -1,5 +1,9 @@
 # Accessibility check
 
+Section 2 makes no intentional visual, interaction, or Semantics changes. The
+existing read-only feed/detail accessibility tests remain the regression
+baseline; manual TalkBack verification is still pending.
+
 ## Section 1 baseline
 
 Section 1 uses standard Material navigation and controls, visible Need/Offer
@@ -32,7 +36,7 @@ separate accessible name, role, focus target, and activation behaviour.
 | Create-form errors are visible and announced | Yes | No, create is later | Planned |
 | Separate Save and Contacted semantics | Yes | No, actions are later | Planned |
 
-No manual TalkBack or VoiceOver verification has been performed in Section 1.
+No manual TalkBack or VoiceOver verification has been performed through Section 2.
 The Android emulator confirmed that cards are exposed as buttons with the
 expected combined descriptions, but this is not a substitute for listening to
 the flow with TalkBack. Before final submission, test the complete flow with

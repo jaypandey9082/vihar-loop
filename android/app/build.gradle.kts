@@ -4,6 +4,8 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val viharLoopMinSdk = 23
+
 android {
     namespace = "com.jaypandey.viharloop"
     compileSdk = flutter.compileSdkVersion
@@ -16,7 +18,7 @@ android {
 
     defaultConfig {
         applicationId = "com.jaypandey.viharloop"
-        minSdk = flutter.minSdkVersion
+        minSdk = viharLoopMinSdk
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -24,7 +26,7 @@ android {
 
     buildTypes {
         release {
-            // Section 1 produces debug builds only. Release signing will be
+            // The current lab slices produce debug builds only. Release signing will be
             // configured when a distribution target exists.
             signingConfig = signingConfigs.getByName("debug")
         }

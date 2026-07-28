@@ -26,14 +26,15 @@ Feed → details → create → save/contact/close → local persistence
      → optional local AI assistance → continued offline use
 ```
 
-Section 1 implements only the read-only feed and details portion.
+Section 2 preserves the read-only feed and details portion and adds encrypted
+local persistence beneath the repository boundary.
 
 ## Today Loop
 
 Every need has a **Needed by** time and every offer has an **Available until**
 time. A later section will use this field for Today and Ending Soon discovery.
-The domain model and sample records include the time now, but Section 1 does
-not expose filters.
+The domain model and persisted sample records include the time now, but
+Section 2 does not expose filters.
 
 ## Why the product is intentionally small
 

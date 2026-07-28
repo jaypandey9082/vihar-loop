@@ -1,61 +1,71 @@
 # Security baseline
 
-Section 1 has no backend, HTTP client, API key, authentication token,
-analytics, telemetry, or persistent database. Listing data is fictional and
-contains broad areas only: no exact address or precise location.
+Section 2 remains local-only: there is no backend, HTTP client, authentication,
+analytics, telemetry, or hosted-service secret. Listing data uses broad
+Vidyavihar areas and does not contain an exact address.
 
 ## Five security decisions
 
-### 1. Where secrets live
+### 1. Secrets
 
-There are no secrets in Section 1 and no `.env` file. A future random
-encryption key will live in platform secure storage. It will not be placed in
-Dart source, assets, generated configuration committed to Git, or sample data.
+The app has no API keys or service credentials. It generates one random
+32-byte Hive database key and stores its Base64 representation under
+`vihar_loop.listings.encryption_key.v1` through FlutterSecureStorage. The key
+is not in Dart source, assets, committed configuration, seed data, or Hive.
 
-**Consequence:** there is currently no secret lifecycle to validate. Adding
-any service credential later requires a new threat and configuration review.
+Android uses the package's standard non-biometric `AndroidOptions`, backed by
+Android Keystore. iOS uses a non-synchronizing,
+`first_unlock_this_device` Keychain item so the key is device-bound and is not
+synchronized through iCloud.
 
 ### 2. Client/server trust boundary
 
-There is no server. All current data is bundled sample data behind a local
-repository boundary. A future remote API must treat every client-supplied
-value as untrusted and enforce authorization and validation server-side.
+There is still no server. All records are local fictional product data.
+Client-side flags must not become authoritative for future identity, payment,
+permission, or moderation decisions. A future server needs independent
+authentication, authorization, and input validation.
 
-**Consequence:** Section 1 does not provide identity, authorization, abuse
-controls, or server-backed integrity.
+### 3. Data at rest
 
-### 3. Encryption at rest and key location
+Listing values are schema-versioned JSON strings inside an encrypted Hive CE
+box. The database key is held separately by platform secure storage. Decoding
+validates every persisted field, code, date, neighbourhood, and key/ID
+relationship. Unsupported, corrupt, or wrong-key data fails the complete read;
+there is no plaintext or in-memory fallback and no automatic deletion.
 
-No persistent data is written in Section 1. Section 2 plans an encrypted local
-store behind `ListingRepository`, using a random encryption key held by
-platform secure storage.
+This protects copied database bytes from casual inspection without the key. It
+does not protect data while the app reads it on an unlocked device, or against
+a rooted, compromised, debugged, or instrumented device. It is not end-to-end
+encryption.
 
-**Consequence:** the current in-memory sample data disappears with the
-process. The later design still cannot protect data while the device is
-unlocked and the app is legitimately accessing it; backup and reset behaviour
-also require explicit tests.
+### 4. Certificate pinning
 
-### 4. Certificate-pinning stance
+Certificate pinning is not applicable because ViharLoop has no remote API or
+network client. It is deferred until a real transport threat model and
+certificate-rotation plan exist.
 
-Certificate pinning is not applicable because there is no remote API or HTTP
-client. It is explicitly deferred. If a server is introduced, the transport
-threat model, certificate rotation, recovery path, and whether platform TLS is
-sufficient must be reviewed before choosing pinning.
+### 5. Telemetry
 
-**Consequence:** no pin or network-security configuration is claimed.
+No analytics, crash reporting, screenshots, remote logs, or telemetry leave
+the device. This also means corrupt-data failures have no automatic diagnostic
+channel.
 
-### 5. Telemetry leaving the device
+## Backup, key loss, and platform status
 
-No analytics, crash reporting, logging backend, or telemetry package exists.
-Nothing is intentionally sent off-device.
+Android sets `allowBackup="false"` and excludes app-data domains from legacy
+backup and Android 12+ cloud-backup/device-transfer rules. Local data therefore
+does not intentionally migrate through Android backup. OEM behavior cannot be
+guaranteed by `allowBackup` alone, which is why explicit extraction rules are
+also committed.
 
-**Consequence:** maintainers receive no remote operational diagnostics. Any
-future telemetry must be opt-in where appropriate, minimized, documented, and
-checked for listing content or location leakage.
+Uninstalling or clearing app data removes the local key and listings. A lost
+or malformed key makes the existing encrypted box unreadable and is not
+silently replaced. An explicit user-controlled reset is a future feature.
 
-## Current limits
+iOS Debug/Profile and Release entitlements declare Keychain access. Source
+configuration is validated, but runtime Keychain behavior remains unverified
+because full Xcode is unavailable.
 
-Section 1 does not yet validate user-entered content because it has no create
-flow. It also does not implement encrypted persistence, key loss recovery,
-local data reset, screenshot protection, or a complete privacy review. The
-sample records must not be treated as evidence that later user data is safe.
+Section 2 has schema and seed version 1 but no migration framework. A future
+schema change needs an explicit, tested migration or repair path; corruption
+must not be hidden by reseeding.

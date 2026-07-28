@@ -1,123 +1,100 @@
 # ADR 0001: Local-first marketplace slice
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-07-28
+- Accepted: 2026-07-29
 
 ## Context
 
-ViharLoop addresses small, time-sensitive exchanges around Vidyavihar. A
-charger needed for two hours or notes available until tomorrow should be easy
-to discover without a broad marketplace, exact address, hosted service, or
-long transaction flow. The first engineering slice must make the product
-credible while leaving storage and optional local AI replaceable.
+ViharLoop supports small, time-sensitive exchanges around Vidyavihar without
+requiring an exact address, hosted service, or long transaction flow. The
+read-only slice needs to survive relaunch while keeping storage replaceable,
+failure visible, and the UI independent of database details.
 
-## Product slice and decision
+## Decision
 
-Build one neighbourhood feed and a read-only details screen first. Model a
-real `Listing`, including the Need/Offer deadline and later mutation flags, but
-do not implement create, save, contacted, close, persistence, or AI behaviour
-before those behaviours can be tested.
-
-Use a lightweight MVVM path:
+Keep the lightweight MVVM boundary:
 
 ```text
-Feed view → FeedViewModel → ListingRepository
-                              ↓
-                    InMemoryListingRepository
+FeedScreen → FeedViewModel → ListingRepository
+                                  ↓
+                         LocalListingRepository
+                                  ↓
+                          ListingLocalStore
+                                  ↓
+                    EncryptedHiveListingStore
+                       ├── ListingRecordCodec
+                       └── EncryptionKeyStore
+                                  ↓
+                       FlutterSecureStorage
 ```
 
-Views own presentation and navigation. `FeedViewModel` owns loading, explicit
-feed state, safe failure copy, and urgency ordering. `ListingRepository` owns
-the data boundary, and the temporary in-memory implementation builds relative
-sample data. Product labels and listing rules live with the domain model.
+`ListingRepository` remains read-only and exposes only `fetchListings()`.
+`LocalListingRepository` coordinates one retryable first-run initialization.
+The store lazily opens and retains one encrypted `Box<String>` named
+`vihar_loop_listings_v1`.
 
-No use-case layer, service locator, generic repository, or third-party state
-package is added because the current behaviour does not justify one.
+Listing values are explicit schema-version-1 JSON records. Stable text codes,
+UTC ISO-8601 timestamps, complete validation, and matching `listing:<id>` keys
+keep the persisted contract independent of UI labels and Dart enum order.
+Generated Hive adapters were not selected because they would couple the domain
+model and stored representation and add generation tooling for nine flat
+records.
 
-## Why local-first and one neighbourhood
+One package-generated random 32-byte key is Base64-encoded only for platform
+secure storage. Missing key material is generated once; malformed or
+inaccessible existing material fails. The encrypted box is never replaced by
+temporary memory or plaintext after failure.
 
-The intended core flow should continue without hosted services. Local-first
-reduces initial infrastructure, data transfer, and demo dependence on network
-conditions. It does not itself guarantee security, backup, synchronization,
-or availability.
+Seed version 1 is stored at `meta:seed_version`. Stable listing records are
+written before the marker. Hive does not provide a cross-record transaction
+for this flow, so an interrupted seed may replay the same idempotent keys on
+the next launch. Once the marker exists, an empty collection stays empty and
+dates are not regenerated.
 
-One neighbourhood creates a clear relevance boundary and supports broad areas
-instead of precise location. Expanding geography can be considered after the
-Vidyavihar flow is useful and safe.
+One invalid record fails the whole read. Partial presentation would conceal
+possible data loss when no telemetry, repair UI, or user-controlled recovery
+exists. Newer seed/schema versions fail rather than being overwritten.
 
-## Current and planned data
-
-Section 1 uses `InMemoryListingRepository`, returning unmodifiable,
-clock-relative sample records. Widgets never import the seed builder. Section
-2 will replace this with encrypted local storage behind the same repository
-boundary and add only the operations required by implemented behaviour.
-
-The planned random encryption key will live in platform secure storage, never
-in Dart source, assets, or committed configuration. Storage migration, reset,
-backup behaviour, corruption handling, and key-loss consequences need tests.
-
-## Planned local AI isolation
-
-A later `LocalAiService` will isolate Draft Assist from the create screen. A
-Gemma implementation and deterministic fallback will both produce strictly
-validated, editable suggestions that require user confirmation. No hosted AI
-is part of the product slice.
-
-## Accessibility implications
-
-Read-only cards currently use one button-like semantic summary. Visible state
-labels ensure meaning is not colour-only, and scalable layouts avoid fixed
-card heights. When card actions are added, semantics and focus handling must
-be redesigned so each action is independently named and operable. Automated
-tests do not replace manual TalkBack verification.
-
-## Security decisions
-
-1. **Secrets:** none exist now; future local encryption keys belong in
-   platform secure storage.
-2. **Trust boundary:** there is no server; if one is added, it must distrust
-   client input and enforce its own authorization and validation.
-3. **Encryption at rest:** no persistence now; encrypted local storage with a
-   random secure-storage key is planned.
-4. **Certificate pinning:** not applicable without a server and explicitly
-   deferred until a remote API has a threat and rotation plan.
-5. **Telemetry:** no analytics, crash reporting, or telemetry leaves the
-   device in this slice.
+Android backup and device transfer are disabled and explicitly excluded
+because restoring the encrypted box without its secure key produces unusable
+data. iOS uses device-bound, non-synchronizing Keychain accessibility and
+committed Keychain entitlements.
 
 ## Alternatives considered
 
-- **Backend-first architecture:** rejected because it adds network
-  availability, identity, deployment, and remote-data decisions before the
-  small offline flow is validated.
+- **In-memory fallback after failure:** rejected because it would hide
+  persistence loss and weaken the security decision.
+- **SQLite/Drift:** not selected because the current dataset is nine flat
+  records with one full read; relational queries, joins, and schema tooling do
+  not yet justify the additional surface.
 - **Direct storage calls from widgets:** rejected because presentation would
-  become coupled to encryption and migration choices.
-- **Hosted AI:** rejected because it contradicts the offline goal and sends
-  user draft content to a remote service.
-- **A generic clean-architecture layer for every action:** rejected because
-  Section 1 has one repository read and no domain workflow requiring those
-  layers.
-- **Building all marketplace features now:** rejected because it would make
-  privacy, accessibility, storage, and demo failures harder to isolate.
+  become coupled to encryption, seeding, and migration.
+- **Hive object adapters/code generation:** rejected to keep the immutable
+  domain model persistence-agnostic and the stored schema explicit.
+- **Backend-first storage:** deferred because it adds identity, network
+  availability, authorization, and remote-data decisions before the local flow
+  is validated.
+- **Hosted AI or broad architecture layers:** outside this slice and contrary
+  to the narrow offline boundary.
 
 ## Consequences accepted
 
-- Current records are fictional and disappear when the process ends.
-- Feed and details can be tested before local storage is selected.
-- There is no multi-device sync, recovery, identity, moderation, or remote
-  availability.
-- The repository contract will evolve when concrete mutations arrive.
-- Manual accessibility and device verification remain required.
+- The feed and details keep their Section 1 appearance and behavior.
+- Local records and timestamps survive normal close/reopen with the same key.
+- Clearing data or uninstalling loses both key and listings; there is no
+  recovery, sync, or multi-device migration.
+- Wrong-key, malformed-key, unknown-version, and corrupt-record conditions
+  produce the existing retryable friendly failure state without repair.
+- Encryption reduces plaintext exposure at rest but does not protect a rooted,
+  unlocked, compromised, or instrumented device.
+- Android is the verified primary platform. iOS source configuration exists,
+  but runtime Keychain verification needs a full Xcode environment.
 
-## Future change points and reversal cost
+## Future change points
 
-- Replacing the in-memory implementation should be low-cost for read-only
-  views because they depend on `ListingRepository`; migrations and error
-  states still add real work.
-- Changing the listing model after persistence ships has a higher cost because
-  stored records require migration.
-- Introducing a backend reverses the local-only trust and telemetry
-  assumptions and needs a new ADR.
-- Introducing internal card actions requires semantic restructuring, not just
-  new icons.
-- Replacing Gemma should be contained by `LocalAiService`, but model packaging,
-  latency, and output validation remain implementation-specific.
+Listing mutations should add only workflow-backed methods to the repository
+and local store. A user-controlled reset must deliberately remove both data
+and key with clear consequences. Schema or seed changes need explicit
+migrations at the codec/store boundary. A backend would reverse local-only
+trust, backup, and telemetry assumptions and requires a new ADR.

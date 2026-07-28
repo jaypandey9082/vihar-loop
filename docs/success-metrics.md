@@ -1,17 +1,22 @@
 # Success metrics
 
-These targets were defined before the complete product was implemented. A
-target is not evidence that the result has been achieved.
+Product targets remain distinct from Section 2 technical evidence. A seeded
+fixture surviving storage reopen is not evidence that the future create flow
+works for users.
 
-| Area | Metric | Target | How it will be checked | Current result | Status |
-| --- | --- | --- | --- | --- | --- |
-| Core task | Create and find a listing | Under 3 minutes | Timed usability session from app launch | Not measured | Planned |
-| Learnability | First listing created without assistance | 4 of 5 representative users | Observed usability sessions | Not measured | Planned |
-| Persistence | Listing survives relaunch | 3 out of 3 relaunches | Create once, force-close, relaunch three times | Not measured | Planned |
-| Accessibility | Core flow usable with accessibility tooling | Feed, details, create, validation, and actions remain operable | Automated semantics/text-scale tests plus manual TalkBack pass | Not measured | Planned |
-| Privacy | No exact address, precise location, or secret stored | Zero occurrences in model, storage, logs, or repository | Model review, fixtures review, repository scan, storage inspection | Not measured | Planned |
-| Local AI | Editable suggestion works without network | Expected Draft Assist flow completes in airplane mode | Scripted model and deterministic-fallback tests | Not measured | Planned |
-| Modularity | UI, storage, and AI can change independently | Each boundary can be replaced without editing the other two | Dependency and focused-test review | Not measured | Planned |
-| Reliability | Main demo runs twice without crash | 2 consecutive successful runs | Repeat final three-minute demo on demo device | Not measured | Planned |
-| Discovery | Urgent listing can be found | Within 10 seconds | Timed task on seeded and user-created data | Not measured | Planned |
-| Reproducibility | Fresh checkout can run from README | One clean setup with no undocumented step | Fresh clone, README commands, Android smoke run | Not measured | Planned |
+| Area | Metric | Target | Current evidence | Status |
+| --- | --- | --- | --- | --- |
+| Core task | Create and find a listing | Under 3 minutes | Create is not implemented | Planned |
+| Learnability | First listing created without assistance | 4 of 5 representative users | Not measurable yet | Planned |
+| Product persistence | User-created listing survives relaunch | 3 out of 3 relaunches | Create is not implemented | Planned |
+| Technical persistence | Seed records and timestamps survive close/reopen | Nine records; exact times unchanged with a later launch clock | Real temporary encrypted Hive test passes | Automatically verified |
+| Wrong-key handling | Existing box cannot normally open with a different key | Controlled failure; no recovery to empty/plaintext | Real encrypted Hive regression test passes | Automatically verified |
+| Raw-file regression | Known title and description absent from raw box bytes | No known fixture plaintext | Temporary-file byte scan passes; not a cryptographic audit | Automatically verified |
+| Android relaunch | Seed feed survives force-stop and relaunch | Same nine records; USB-C listing retained its 4:47 AM deadline; details reopened on API 36 | Clear-data, launch, force-stop, and relaunch check passed | Manually verified |
+| Accessibility | Read-only feed/details remain operable | Existing semantics and 200% text-scale tests | Automated regression tests pass; TalkBack pending | Partially verified |
+| Privacy | No exact address, precise location, or committed key | Zero occurrences in model, fixtures, repository, or Hive key location | Broad-area, tracked-file, generated-data, local-path, and secret-pattern audits pass | Automatically verified |
+| Local AI | Editable suggestion works without network | Expected Draft Assist flow completes offline | No AI implementation | Planned |
+| Modularity | UI remains independent of storage | No Hive/secure-storage imports in UI | Repository/data-source dependency review | Automatically verified |
+| Reliability | Main demo runs twice without crash | 2 consecutive complete-product runs | Full product workflow does not exist | Planned |
+| Discovery | Urgent listing can be found | Within 10 seconds | Ordering exists; no timed usability result | Planned |
+| Reproducibility | Fresh checkout runs from README | Setup, 44 tests, and Android debug build pass | Clean local clone from committed history passed without key, database, or `.env` | Automatically verified |
