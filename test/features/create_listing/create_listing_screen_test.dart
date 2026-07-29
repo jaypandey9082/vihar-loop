@@ -108,7 +108,7 @@ void main() {
     expect(repository.drafts, isEmpty);
     await _scrollTo(tester, 'Title');
     expect(
-      find.text(ListingDraftValidator.contactInformationError),
+      find.text(ListingDraftValidator.directContactError),
       findsOneWidget,
     );
 
@@ -128,12 +128,44 @@ void main() {
     expect(repository.drafts, isEmpty);
     await _scrollTo(tester, 'Title');
     expect(
-      find.text(ListingDraftValidator.contactInformationError),
+      find.text(ListingDraftValidator.directContactError),
       findsNWidgets(2),
     );
     expect(find.text('See www.example.test/listing'), findsOneWidget);
     expect(
       find.text('Please call +91 98765-43210 after rehearsal.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('visible validation distinguishes precise-location text',
+      (tester) async {
+    final repository = _FormRepository();
+    await _openForm(tester, repository, now);
+
+    await tester.enterText(
+      find.byType(TextFormField).first,
+      'Calculator from Flat 302',
+    );
+    await tester.enterText(
+      find.byType(TextFormField).last,
+      'Collect this useful calculator from Wing B after class.',
+    );
+    tester.testTextInput.hide();
+    await tester.pumpAndSettle();
+    await _scrollTo(tester, 'Post need');
+    await tester.tap(find.text('Post need'));
+    await tester.pumpAndSettle();
+
+    expect(repository.drafts, isEmpty);
+    await _scrollTo(tester, 'Title');
+    expect(
+      find.text(ListingDraftValidator.preciseLocationError),
+      findsNWidgets(2),
+    );
+    expect(find.text('Calculator from Flat 302'), findsOneWidget);
+    expect(
+      find.text('Collect this useful calculator from Wing B after class.'),
       findsOneWidget,
     );
   });
@@ -363,6 +395,11 @@ class _FormRepository implements ListingRepository {
 
   @override
   Future<List<Listing>> fetchListings() async => const [];
+
+  @override
+  Future<List<Listing>> resetLocalData() {
+    throw UnimplementedError();
+  }
 
   @override
   Future<Listing> setSaved({

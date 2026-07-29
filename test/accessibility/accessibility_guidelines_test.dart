@@ -8,6 +8,7 @@ import 'package:vihar_loop/domain/listing.dart';
 import 'package:vihar_loop/features/create_listing/create_listing_screen.dart';
 import 'package:vihar_loop/features/feed/feed_screen.dart';
 import 'package:vihar_loop/features/listing_details/listing_details_screen.dart';
+import 'package:vihar_loop/features/privacy_data/privacy_data_screen.dart';
 
 import '../support/accessibility_test_repository.dart';
 
@@ -216,6 +217,86 @@ void main() {
         semantics.dispose();
       }
     });
+
+    testWidgets('Privacy & data and its dialog pass in both themes',
+        (tester) async {
+      final semantics = tester.ensureSemantics();
+      try {
+        for (final mode in [ThemeMode.light, ThemeMode.dark]) {
+          await _setSurface(tester, const Size(411, 1000));
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: AppTheme.light,
+              darkTheme: AppTheme.dark,
+              themeMode: mode,
+              home: PrivacyDataScreen(
+                repository: AccessibilityTestRepository(),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          await tester.scrollUntilVisible(
+            find.byKey(const Key('reset-local-data-button')),
+            250,
+            scrollable: find.byType(Scrollable).last,
+          );
+          await _expectGuidelines(tester, contrast: true);
+
+          tester.semantics.tap(
+            find.semantics.byLabel('Reset local data').last,
+          );
+          await tester.pumpAndSettle();
+          await _expectGuidelines(tester, contrast: true);
+          tester.semantics.tap(find.semantics.byLabel('Keep data'));
+          await tester.pumpAndSettle();
+        }
+      } finally {
+        semantics.dispose();
+      }
+    });
+
+    testWidgets('pending local reset stays labelled and disabled',
+        (tester) async {
+      final semantics = tester.ensureSemantics();
+      final pending = Completer<List<Listing>>();
+      final repository = AccessibilityTestRepository()
+        ..resetCompleter = pending;
+      try {
+        await _setSurface(tester, const Size(411, 1000));
+        await tester.pumpWidget(
+          MaterialApp(
+            home: PrivacyDataScreen(repository: repository),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.scrollUntilVisible(
+          find.byKey(const Key('reset-local-data-button')),
+          250,
+          scrollable: find.byType(Scrollable).last,
+        );
+        tester.semantics.tap(
+          find.semantics.byLabel('Reset local data').last,
+        );
+        await tester.pumpAndSettle();
+        tester.semantics.tap(
+          find.semantics.byLabel('Reset local data').last,
+        );
+        await tester.pump();
+
+        await _expectGuidelines(tester);
+        expect(
+          tester
+              .getSemantics(find.byKey(const Key('reset-local-data-button')))
+              .label,
+          'Resetting local data',
+        );
+
+        pending.complete(const []);
+        await tester.pumpAndSettle();
+      } finally {
+        semantics.dispose();
+      }
+    });
   });
 
   group('large text and constrained layouts', () {
@@ -321,6 +402,42 @@ void main() {
       expect(find.text('Keep open'), findsOneWidget);
       expect(find.text('Close listing'), findsWidgets);
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('Privacy & data is safe at 200 percent in both orientations',
+        (tester) async {
+      for (final size in [const Size(320, 568), const Size(568, 320)]) {
+        await _setSurface(tester, size);
+        await tester.pumpWidget(
+          _scaledApp(
+            PrivacyDataScreen(
+              repository: AccessibilityTestRepository(),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final scrollable = tester.state<ScrollableState>(
+          find
+              .descendant(
+                of: find.byType(SingleChildScrollView),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        scrollable.position.jumpTo(scrollable.position.maxScrollExtent);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('reset-local-data-button')),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+
+        await tester.tap(find.byKey(const Key('reset-local-data-button')));
+        await tester.pumpAndSettle();
+        expect(find.text('Keep data'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+      }
     });
   });
 }

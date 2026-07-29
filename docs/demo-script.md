@@ -16,7 +16,7 @@ planned, so the complete-product demo is not yet claimed.
 | 7 | Use editable local Draft Assist | Planned |
 | 8 | Relaunch and show persistence | Created record and state persist |
 | 9 | Close the created listing | Implemented for local-origin records |
-| 10 | Point to architecture, accessibility, and security evidence | Section 5 automated evidence is current |
+| 10 | Point to architecture, accessibility, and security evidence | Section 6 automated evidence is current |
 
 ## Section 4 creation and Today Loop demonstration
 
@@ -63,3 +63,20 @@ The current automated host could not reliably perform the complete TalkBack
 multi-gesture create/picker/dialog walkthrough. Do not present that full manual
 script as completed until it is run on a directly controlled emulator or
 physical Android device.
+
+## Section 6 privacy and reset proof
+
+Keep this proof short and never display the encryption key:
+
+1. Open Create, enter **Flat 302, Wing B**, and show the precise-location error.
+2. Replace it with broad wording such as **Near Vidyavihar station** and create
+   one synthetic local listing.
+3. Save or mark the local flow Contacted.
+4. Open **Privacy & data** and show the data inventory and encryption limit.
+5. Tap **Reset local data**, choose **Keep data**, and show nothing changed.
+6. Confirm reset on the second attempt.
+7. Show the unfiltered feed with exactly nine fictional samples and no local
+   listing or private marker.
+8. Explain that the encrypted box was deleted before its targeted key, then a
+   fresh key and samples were created through normal initialization. Call this
+   a practical cryptographic reset, not forensic erasure.

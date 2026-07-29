@@ -210,6 +210,11 @@ class _DetailsRepository implements ListingRepository {
   }
 
   @override
+  Future<List<Listing>> resetLocalData() {
+    throw UnimplementedError();
+  }
+
+  @override
   Future<Listing> setSaved({
     required String listingId,
     required bool isSaved,

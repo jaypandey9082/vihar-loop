@@ -350,22 +350,104 @@ void main() {
     expect(find.text('Filtered offer card'), findsOneWidget);
     expect(find.text('First complete-list need'), findsNothing);
   });
+
+  testWidgets('ready feed opens Privacy & data and cancel keeps feed unchanged',
+      (tester) async {
+    final original = _testListing(title: 'Listing that stays after cancel');
+    final repository = _SequenceRepository([
+      [original],
+    ]);
+    await tester.pumpWidget(ViharLoopApp(listingRepository: repository));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Privacy & data'), findsOneWidget);
+    await tester.tap(find.text('Privacy & data'));
+    await tester.pumpAndSettle();
+    expect(find.text('What stays on this device'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.arrow_back));
+    await tester.pumpAndSettle();
+
+    expect(find.text(original.title), findsOneWidget);
+    expect(repository.resetCalls, 0);
+  });
+
+  testWidgets(
+      'ready reset replaces records, clears filters, and reports success',
+      (tester) async {
+    final oldLocal = _testListing(
+      id: 'old-local',
+      title: 'Old local canary',
+      origin: ListingOrigin.local,
+      isSaved: true,
+      isContacted: true,
+      status: ListingStatus.closed,
+    );
+    final resetSamples = _resetSamples();
+    final repository = _SequenceRepository(
+      [
+        [oldLocal],
+      ],
+      resetResult: resetSamples,
+    );
+    await tester.pumpWidget(ViharLoopApp(listingRepository: repository));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Offers'));
+    await tester.pump();
+
+    await _openAndConfirmPrivacyReset(tester);
+
+    expect(repository.resetCalls, 1);
+    expect(find.text('Old local canary'), findsNothing);
+    expect(find.text('Reset sample 0'), findsOneWidget);
+    expect(find.text('Showing 9 listings'), findsOneWidget);
+    expect(find.text('Local data reset. Sample listings restored.'),
+        findsOneWidget);
+    final allChip = tester.widget<ChoiceChip>(
+      find.widgetWithText(ChoiceChip, 'All'),
+    );
+    expect(allChip.selected, isTrue);
+  });
+
+  testWidgets('empty and failed feeds expose reset recovery to Ready',
+      (tester) async {
+    for (final response in <Object>[const <Listing>[], Exception('corrupt')]) {
+      final repository = _SequenceRepository(
+        [response],
+        resetResult: _resetSamples(),
+      );
+      await tester.pumpWidget(ViharLoopApp(listingRepository: repository));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Privacy & data'), findsOneWidget);
+      if (response is Exception) {
+        expect(find.text('Retry loading listings'), findsOneWidget);
+      } else {
+        expect(find.text('Post a need or offer'), findsOneWidget);
+      }
+
+      await _openAndConfirmPrivacyReset(tester);
+
+      expect(repository.resetCalls, 1);
+      expect(find.text('Showing 9 listings'), findsOneWidget);
+      expect(find.text('Reset sample 0'), findsOneWidget);
+      expect(find.text('Unable to load listings'), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+    }
+  });
 }
 
 Future<void> _selectDropdown<T>(
   WidgetTester tester,
   String option,
 ) async {
-  final label = T == ListingCategory
-      ? 'Category'
-      : T == ApproximateArea
-          ? 'Approximate area'
-          : 'Contact preference';
   await tester.scrollUntilVisible(
-    find.text(label),
+    find.byType(DropdownButtonFormField<T>),
     300,
     scrollable: find.byType(Scrollable).last,
   );
+  await tester.ensureVisible(find.byType(DropdownButtonFormField<T>));
+  await tester.pumpAndSettle();
   await tester.tap(find.byType(DropdownButtonFormField<T>));
   await tester.pumpAndSettle();
   await tester.tap(find.text(option).last);
@@ -381,11 +463,34 @@ Future<void> _showFeedListing(WidgetTester tester, String title) async {
   await tester.pumpAndSettle();
 }
 
+Future<void> _openAndConfirmPrivacyReset(WidgetTester tester) async {
+  await tester.tap(find.text('Privacy & data'));
+  await tester.pumpAndSettle();
+  await tester.scrollUntilVisible(
+    find.byKey(const Key('reset-local-data-button')),
+    300,
+    scrollable: find.byType(Scrollable).last,
+  );
+  await tester.tap(find.byKey(const Key('reset-local-data-button')));
+  await tester.pumpAndSettle();
+  final confirm = find.descendant(
+    of: find.byType(AlertDialog),
+    matching: find.widgetWithText(FilledButton, 'Reset local data'),
+  );
+  await tester.tap(confirm);
+  await tester.pumpAndSettle();
+}
+
 class _SequenceRepository implements ListingRepository {
-  _SequenceRepository(this._responses);
+  _SequenceRepository(
+    this._responses, {
+    this.resetResult,
+  });
 
   final List<Object> _responses;
+  final List<Listing>? resetResult;
   int callCount = 0;
+  int resetCalls = 0;
   List<Listing> _current = const [];
   List<Listing> get current => List.unmodifiable(_current);
 
@@ -419,6 +524,13 @@ class _SequenceRepository implements ListingRepository {
     );
     _current = [..._current, created];
     return created;
+  }
+
+  @override
+  Future<List<Listing>> resetLocalData() async {
+    resetCalls++;
+    _current = resetResult ?? _current;
+    return current;
   }
 
   @override
@@ -481,6 +593,11 @@ class _PendingRepository implements ListingRepository {
   Future<List<Listing>> fetchListings() => result;
 
   @override
+  Future<List<Listing>> resetLocalData() {
+    throw UnimplementedError();
+  }
+
+  @override
   Future<Listing> createListing(ListingDraft draft) {
     throw UnimplementedError();
   }
@@ -535,5 +652,17 @@ Listing _testListing({
     isSaved: isSaved,
     isContacted: isContacted,
     origin: origin,
+  );
+}
+
+List<Listing> _resetSamples() {
+  return List.generate(
+    9,
+    (index) => _testListing(
+      id: 'reset-sample-$index',
+      title: 'Reset sample $index',
+      kind: index.isEven ? ListingKind.need : ListingKind.offer,
+      origin: ListingOrigin.sample,
+    ),
   );
 }

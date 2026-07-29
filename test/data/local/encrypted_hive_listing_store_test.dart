@@ -579,6 +579,247 @@ void main() {
       expect(await store!.readAll(), isEmpty);
       expect(keyReads, 2);
     });
+
+    test('deleteAllData deletes unopened data without reading its key',
+        () async {
+      final original = buildTestListing(id: 'unopened-reset-canary');
+      store = createStore();
+      await store!.seedIfRequired([original]);
+      await store!.close();
+
+      final keyStore = _ResetKeyStore(
+        currentKey: encryptionKey,
+        readError: Exception('must not read while deleting'),
+      );
+      store = EncryptedHiveListingStore(
+        keyStore: keyStore,
+        boxName: boxName,
+        initializeHive: (hive) async => hive.init(directory.path),
+      );
+
+      await store!.deleteAllData();
+
+      expect(keyStore.readCalls, 0);
+      expect(keyStore.deleteCalls, 1);
+      expect(await Hive.boxExists(boxName), isFalse);
+    });
+
+    test('deleteAllData clears an open box and later uses a fresh key',
+        () async {
+      final originalKey = List<int>.filled(32, 11);
+      final replacementKey = List<int>.filled(32, 22);
+      final keyStore = _ResetKeyStore(
+        currentKey: originalKey,
+        nextKey: replacementKey,
+      );
+      store = EncryptedHiveListingStore(
+        keyStore: keyStore,
+        boxName: boxName,
+        initializeHive: (hive) async => hive.init(directory.path),
+      );
+      await store!.seedIfRequired([
+        buildTestListing(id: 'old-local-reset-canary'),
+      ]);
+
+      await store!.deleteAllData();
+      await store!.seedIfRequired([
+        buildTestListing(id: 'replacement'),
+      ]);
+      expect((await store!.readAll()).single.id, 'replacement');
+      expect(keyStore.generatedKeys, [replacementKey]);
+      expect(keyStore.deleteCalls, 1);
+      await store!.close();
+      await Hive.close();
+
+      await expectLater(
+        Hive.openBox<String>(
+          boxName,
+          encryptionCipher: HiveAesCipher(originalKey),
+          crashRecovery: false,
+        ),
+        throwsA(anything),
+      );
+      await Hive.close();
+
+      final reopened = EncryptedHiveListingStore(
+        keyStore: _FixedKeyStore(replacementKey),
+        boxName: boxName,
+        initializeHive: (hive) async => hive.init(directory.path),
+      );
+      store = reopened;
+      expect((await reopened.readAll()).single.id, 'replacement');
+    });
+
+    test('box deletion failure preserves the key and remains retryable',
+        () async {
+      var deleteAttempts = 0;
+      final keyStore = _ResetKeyStore(currentKey: encryptionKey);
+      store = EncryptedHiveListingStore(
+        keyStore: keyStore,
+        boxName: boxName,
+        initializeHive: (hive) async => hive.init(directory.path),
+        deleteBox: (hive, name) async {
+          deleteAttempts++;
+          if (deleteAttempts == 1) {
+            throw Exception('delete failed');
+          }
+          await hive.deleteBoxFromDisk(name);
+        },
+      );
+      await store!.seedIfRequired([buildTestListing()]);
+
+      await expectLater(
+        store!.deleteAllData(),
+        throwsA(isA<LocalStorageException>()),
+      );
+      expect(keyStore.deleteCalls, 0);
+
+      await store!.deleteAllData();
+      expect(deleteAttempts, 2);
+      expect(keyStore.deleteCalls, 1);
+      expect(await Hive.boxExists(boxName), isFalse);
+    });
+
+    test('key deletion failure is reported after box deletion and can retry',
+        () async {
+      final keyStore = _ResetKeyStore(
+        currentKey: encryptionKey,
+        deleteFailures: 1,
+      );
+      store = EncryptedHiveListingStore(
+        keyStore: keyStore,
+        boxName: boxName,
+        initializeHive: (hive) async => hive.init(directory.path),
+      );
+      await store!.seedIfRequired([buildTestListing()]);
+
+      await expectLater(
+        store!.deleteAllData(),
+        throwsA(isA<LocalStorageException>()),
+      );
+      expect(await Hive.boxExists(boxName), isFalse);
+      expect(keyStore.deleteCalls, 1);
+
+      await store!.deleteAllData();
+      expect(keyStore.deleteCalls, 2);
+      expect(keyStore.currentKey, isNull);
+    });
+
+    test('deleteAllData is idempotent when box and key are absent', () async {
+      final keyStore = _ResetKeyStore();
+      store = EncryptedHiveListingStore(
+        keyStore: keyStore,
+        boxName: boxName,
+        initializeHive: (hive) async => hive.init(directory.path),
+      );
+
+      await store!.deleteAllData();
+      await store!.deleteAllData();
+
+      expect(keyStore.readCalls, 0);
+      expect(keyStore.deleteCalls, 2);
+      expect(await Hive.boxExists(boxName), isFalse);
+    });
+
+    test('repository reset completes the encrypted fresh-key lifecycle',
+        () async {
+      final keyA = List<int>.filled(32, 41);
+      final keyB = List<int>.filled(32, 82);
+      final keyStore = _ResetKeyStore(currentKey: keyA, nextKey: keyB);
+      final now = DateTime(2026, 8, 3, 10);
+      store = EncryptedHiveListingStore(
+        keyStore: keyStore,
+        boxName: boxName,
+        initializeHive: (hive) async => hive.init(directory.path),
+      );
+      final repository = LocalListingRepository(
+        store: store!,
+        clock: () => now,
+        idGenerator: (_) => 'local-reset-canary',
+      );
+      final initial = await repository.fetchListings();
+      final created = await repository.createListing(
+        ListingDraft(
+          kind: ListingKind.offer,
+          title: 'Unique reset canary item',
+          description: 'A synthetic item is available near Vidyavihar station.',
+          category: ListingCategory.other,
+          approximateArea: ApproximateArea.somaiyaSide,
+          contactPreference: ContactPreference.publicPlace,
+          activeUntil: now.add(const Duration(hours: 2)),
+        ),
+      );
+      await repository.setSaved(
+        listingId: initial.first.id,
+        isSaved: true,
+      );
+      await repository.setContacted(
+        listingId: initial[1].id,
+        isContacted: true,
+      );
+      await repository.setStatus(
+        listingId: created.id,
+        status: ListingStatus.closed,
+      );
+      expect(await repository.fetchListings(), hasLength(10));
+
+      final reset = await repository.resetLocalData();
+
+      expect(reset, hasLength(9));
+      expect(
+          reset.every((item) => item.origin == ListingOrigin.sample), isTrue);
+      expect(reset.every((item) => !item.isSaved && !item.isContacted), isTrue);
+      expect(reset.any((item) => item.id == created.id), isFalse);
+      expect(reset.map((item) => item.id).toSet(), hasLength(9));
+      expect(keyStore.deleteCalls, 1);
+      expect(keyStore.currentKey, keyB);
+      expect(keyStore.generatedKeys, [keyB]);
+      expect(
+        Hive.box<String>(boxName).get(
+          EncryptedHiveListingStore.seedVersionKey,
+        ),
+        EncryptedHiveListingStore.seedVersion,
+      );
+
+      await Hive.box<String>(boxName).flush();
+      final bytes = <int>[];
+      await for (final entity in directory.list(recursive: true)) {
+        if (entity is File) {
+          bytes.addAll(await entity.readAsBytes());
+        }
+      }
+      expect(
+        utf8.decode(bytes, allowMalformed: true),
+        isNot(contains('Unique reset canary item')),
+      );
+
+      await store!.close();
+      await Hive.close();
+      await expectLater(
+        Hive.openBox<String>(
+          boxName,
+          encryptionCipher: HiveAesCipher(keyA),
+          crashRecovery: false,
+        ),
+        throwsA(anything),
+      );
+      await Hive.close();
+
+      store = EncryptedHiveListingStore(
+        keyStore: _FixedKeyStore(keyB),
+        boxName: boxName,
+        initializeHive: (hive) async => hive.init(directory.path),
+      );
+      final reopened = await LocalListingRepository(
+        store: store!,
+        clock: () => now.add(const Duration(days: 30)),
+      ).fetchListings();
+      expect(reopened, hasLength(9));
+      expect(reopened.map((item) => item.id).toSet(), hasLength(9));
+      expect(reopened.any((item) => item.id == created.id), isFalse);
+      expect(ListingRecordCodec.schemaVersion, 1);
+      expect(EncryptedHiveListingStore.seedVersion, '1');
+    });
   });
 }
 
@@ -586,6 +827,9 @@ class _FixedKeyStore implements EncryptionKeyStore {
   const _FixedKeyStore(this.key);
 
   final List<int> key;
+
+  @override
+  Future<void> deleteKey() async {}
 
   @override
   Future<List<int>> readOrCreateKey() async => key;
@@ -598,6 +842,9 @@ class _RetryingKeyStore implements EncryptionKeyStore {
   var _calls = 0;
 
   @override
+  Future<void> deleteKey() async {}
+
+  @override
   Future<List<int>> readOrCreateKey() async {
     _calls++;
     onRead();
@@ -605,5 +852,47 @@ class _RetryingKeyStore implements EncryptionKeyStore {
       throw Exception('temporary keychain failure');
     }
     return List<int>.filled(32, 7);
+  }
+}
+
+class _ResetKeyStore implements EncryptionKeyStore {
+  _ResetKeyStore({
+    this.currentKey,
+    this.nextKey,
+    this.readError,
+    this.deleteFailures = 0,
+  });
+
+  List<int>? currentKey;
+  final List<int>? nextKey;
+  final Object? readError;
+  int deleteFailures;
+  int readCalls = 0;
+  int deleteCalls = 0;
+  final List<List<int>> generatedKeys = [];
+
+  @override
+  Future<void> deleteKey() async {
+    deleteCalls++;
+    if (deleteFailures > 0) {
+      deleteFailures--;
+      throw Exception('secure delete failed');
+    }
+    currentKey = null;
+  }
+
+  @override
+  Future<List<int>> readOrCreateKey() async {
+    readCalls++;
+    if (readError case final error?) {
+      throw error;
+    }
+    if (currentKey case final key?) {
+      return key;
+    }
+    final generated = nextKey ?? List<int>.filled(32, 77);
+    currentKey = generated;
+    generatedKeys.add(generated);
+    return generated;
   }
 }

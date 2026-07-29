@@ -5,6 +5,7 @@ import 'package:vihar_loop/app/vihar_loop_app.dart';
 import 'package:vihar_loop/domain/listing.dart';
 import 'package:vihar_loop/features/create_listing/create_listing_screen.dart';
 import 'package:vihar_loop/features/listing_details/listing_details_screen.dart';
+import 'package:vihar_loop/features/privacy_data/privacy_data_screen.dart';
 
 import '../support/accessibility_test_repository.dart';
 
@@ -32,6 +33,7 @@ void main() {
           containsAllInOrder([
             contains('Nearby needs and offers'),
             contains('Post a need or offer'),
+            contains('Privacy & data'),
             contains('Type'),
             contains('All'),
             contains('Needs'),
@@ -112,7 +114,7 @@ void main() {
           containsAllInOrder([
             contains('Post a need or offer'),
             contains('Share one small, time-sensitive'),
-            contains('Use a broad area'),
+            contains('Choose a broad area'),
             contains('What are you posting'),
             contains('Title'),
             contains('Description'),
@@ -180,6 +182,57 @@ void main() {
         semantics.dispose();
       }
     });
+
+    testWidgets('Privacy & data and reset dialog retain a useful order',
+        (tester) async {
+      final semantics = tester.ensureSemantics();
+      try {
+        await _setSurface(tester, const Size(411, 1200));
+        await tester.pumpWidget(
+          MaterialApp(
+            home: PrivacyDataScreen(
+              repository: AccessibilityTestRepository(),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          _traversalLabels(tester),
+          containsAllInOrder([
+            contains('Privacy & data'),
+            contains('ViharLoop works locally'),
+            contains('What stays on this device'),
+            contains('What ViharLoop does not collect'),
+            contains('How local protection works'),
+            contains('Reset local data'),
+            contains('This cannot be undone'),
+            contains('Reset local data'),
+          ]),
+        );
+
+        await tester.scrollUntilVisible(
+          find.byKey(const Key('reset-local-data-button')),
+          250,
+          scrollable: find.byType(Scrollable).last,
+        );
+        tester.semantics.tap(
+          find.semantics.byLabel('Reset local data').last,
+        );
+        await tester.pumpAndSettle();
+        expect(
+          _traversalLabels(tester),
+          containsAllInOrder([
+            contains('Reset local data?'),
+            contains('This removes every listing and activity'),
+            contains('Keep data'),
+            contains('Reset local data'),
+          ]),
+        );
+      } finally {
+        semantics.dispose();
+      }
+    });
   });
 
   group('keyboard and alternative input', () {
@@ -203,7 +256,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      for (var index = 0; index < 4; index += 1) {
+      for (var index = 0; index < 5; index += 1) {
         await tester.sendKeyEvent(LogicalKeyboardKey.tab);
         await tester.pump();
       }

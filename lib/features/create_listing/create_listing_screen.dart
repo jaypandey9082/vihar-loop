@@ -106,8 +106,10 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        'Use a broad area below. Don’t include a phone number, '
-                        'email, link, or exact address.',
+                        'Choose a broad area below. Don’t include a flat or '
+                        'room number, street address, PIN code, map '
+                        'coordinates, phone number, email, link, social '
+                        'handle, or payment ID.',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               color: Theme.of(context)
                                   .colorScheme
@@ -181,8 +183,8 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                         decoration: const InputDecoration(
                           labelText: 'Description',
                           helperText:
-                              'Describe what someone should know. Don’t add '
-                              'personal contact details.',
+                              'Describe what someone should know without '
+                              'contact details or a precise location.',
                           border: OutlineInputBorder(),
                         ),
                         minLines: 4,

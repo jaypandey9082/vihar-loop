@@ -33,9 +33,9 @@ Statuses mean:
 | Manual TalkBack | Section 5 | `docs/accessibility-check.md` | Implemented, verification pending | Representative API 36 flow and Save speech observed; complete create/picker/progress/dialog script remains blocked by reliable remote gesture control |
 | VoiceOver | Later | iOS runtime | Blocked | Full Xcode is unavailable |
 | No committed secret | Section 1 onward | `.gitignore`, repository scan | Done | No secret or environment file added |
-| No exact address | Section 1 onward | Domain choices and sample data | Done | Only approved broad areas used |
-| Input validation | Section 4 | Create form, validator, and repository | Done | Structural and obvious phone/email/URL rejection pass; broader exact-address hardening remains Section 6 |
-| Local data reset | Later | Persistent repository/settings | Planned | Persistence exists; no reset method or UI is implemented |
+| No exact address | Section 1 onward; hardened Section 6 | Domain choices, `ListingPrivacyValidator`, form, repository | Done | Broad-area-only field plus precise-location heuristics, repository revalidation, matrix tests, and synthetic API 36 rejection pass; heuristic limitation remains |
+| Input validation | Section 4 and 6 | Create form, validators, and repository | Done | Structural, direct-contact/payment, and precise-location checks use one shared boundary in UI and repository |
+| Local data reset | Section 6 | Privacy route, repository, encrypted store, targeted key store | Done | UI and failure tests, real encrypted fresh-key lifecycle, nine-sample reseed, error-state recovery, and reopen proof pass |
 | Encrypted local persistence | Section 2 | `lib/data/local/encrypted_hive_listing_store.dart` | Done | Real temporary-Hive encryption and reopen tests pass |
 | Versioned record codec | Section 2 | `lib/data/local/listing_record_codec.dart` | Done | Full-field mapping and invalid-record tests pass |
 | Secure encryption-key location | Section 2 | `lib/security/flutter_secure_encryption_key_store.dart` | Done | 32-byte Base64 lifecycle tested without MethodChannel |
@@ -53,23 +53,23 @@ Statuses mean:
 | Product document | Section 1 | `docs/product-slice.md` | Done | Target, boundary, workflow, scope recorded |
 | Metrics document | Section 1–2 | `docs/success-metrics.md` | Done | Technical persistence proof stays separate from product targets |
 | Accessibility document | Section 1 | `docs/accessibility-check.md` | Done | Automated and manual states distinguished |
-| Security document | Section 1–2 | `docs/security-baseline.md` | Done | Implemented key, encryption, backup, and failure decisions addressed |
+| Release permissions | Section 6 | Release APK/merged manifest audit | Done | `apkanalyzer`/`aapt` show no product INTERNET or unnecessary sensitive permission; exported components reviewed |
+| Logging/plaintext audit | Section 6 | Production scan, logcat/raw-Hive checks | Done | No production logging boundary; automated ciphertext/canary reset regressions pass; dynamic evidence limits documented |
+| Security document | Section 1–6 | `docs/security-baseline.md` | Done | Data inventory, decisions, validation, reset, release, leakage, supply-chain, and residual-risk evidence current |
 | Local-AI document | Section 1 | `docs/local-ai-note.md` | Done | Clearly marked not implemented |
-| README | Section 1–4 | `README.md` | Done | Section 4 creation, Today Loop, persistence, and honest gaps included |
+| README | Section 1–6 | `README.md` | Done | Section 6 privacy, reset, release audit, and honest gaps included |
 | Three-minute demo | Draft in Section 1; final later | `docs/demo-script.md` | Implemented, verification pending | Non-AI Section 4 flow works; final demo still lacks Draft Assist |
-| Fresh checkout | Section 2 gate | README commands and a clean copy | Done | Committed-history clone passes setup, analysis, 44 tests, and Android debug build |
-| Clean repository | Section 2 gate | `.gitignore`, `git status`, `git diff --check` | Done | Staged-file, generated-data, local-path, and secret-pattern audits pass |
+| Fresh checkout | Section 6 gate | README commands and a clean clone | Done | Committed-history clone passes setup, analysis, 246 tests, 38 accessibility tests, and Android debug/release builds |
+| Clean repository | Section 6 gate | `.gitignore`, `git status`, `git diff --check` | Done | Staged-file, generated-data, local-path, dependency, and secret-pattern audits pass |
 
 ## Current verification snapshot
 
-Flutter 3.44.8 and Dart 3.12.2 are installed. Section 5 formatting, analysis,
-148 unit/widget tests, the 31-test accessibility subset, and Android debug build
-pass. Official guidelines report no failures in the tested target, label, and
-contrast states. API 36 provides representative TalkBack and large-system-
-setting evidence in addition to the earlier create/close/relaunch proof.
+Flutter 3.44.8 and Dart 3.12.2 are installed. Section 6 formatting, analysis,
+246 unit/widget tests, the 38-test accessibility subset, and Android
+debug/release builds pass. Official guidelines report no failures in tested
+target, label, contrast, and scaled layout states.
 
 Android XML and iOS source plists validate. Full Xcode, VoiceOver, Accessibility
 Scanner, and completion of the full TalkBack script remain pending.
-User-facing reset, local AI, `LocalAiService`, deterministic
-fallback, and Gemma remain Planned; the complete MAL homework is not claimed
-finished.
+Local AI, `LocalAiService`, deterministic fallback, and Gemma remain Planned;
+the complete MAL homework is not claimed finished.

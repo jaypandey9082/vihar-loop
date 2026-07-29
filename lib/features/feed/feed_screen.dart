@@ -10,6 +10,7 @@ import 'package:vihar_loop/features/create_listing/create_listing_screen.dart';
 import 'package:vihar_loop/features/feed/feed_view_model.dart';
 import 'package:vihar_loop/features/feed/listing_card.dart';
 import 'package:vihar_loop/features/listing_details/listing_details_screen.dart';
+import 'package:vihar_loop/features/privacy_data/privacy_data_screen.dart';
 
 class FeedScreen extends StatefulWidget {
   const FeedScreen({
@@ -53,15 +54,20 @@ class _FeedScreenState extends State<FeedScreen> {
           builder: (context, _) {
             return switch (_viewModel.status) {
               FeedStatus.initial || FeedStatus.loading => const _LoadingFeed(),
-              FeedStatus.empty => _EmptyFeed(onCreate: _openCreate),
+              FeedStatus.empty => _EmptyFeed(
+                  onCreate: _openCreate,
+                  onPrivacyData: _openPrivacyData,
+                ),
               FeedStatus.failed => _ErrorFeed(
                   message: _viewModel.message ?? FeedViewModel.failureMessage,
                   onRetry: _viewModel.retry,
+                  onPrivacyData: _openPrivacyData,
                 ),
               FeedStatus.ready => _ReadyFeed(
                   viewModel: _viewModel,
                   onListingTap: _openDetails,
                   onCreate: _openCreate,
+                  onPrivacyData: _openPrivacyData,
                 ),
             };
           },
@@ -102,6 +108,28 @@ class _FeedScreenState extends State<FeedScreen> {
       ),
     );
   }
+
+  Future<void> _openPrivacyData() async {
+    final listings = await Navigator.of(context).push<List<Listing>>(
+      MaterialPageRoute<List<Listing>>(
+        builder: (context) => PrivacyDataScreen(
+          repository: widget.repository,
+        ),
+      ),
+    );
+    if (!mounted || listings == null) {
+      return;
+    }
+    if (_viewModel.applyLocalDataReset(listings)) {
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.clearSnackBars();
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Local data reset. Sample listings restored.'),
+        ),
+      );
+    }
+  }
 }
 
 class _ReadyFeed extends StatelessWidget {
@@ -109,17 +137,24 @@ class _ReadyFeed extends StatelessWidget {
     required this.viewModel,
     required this.onListingTap,
     required this.onCreate,
+    required this.onPrivacyData,
   });
 
   final FeedViewModel viewModel;
   final ValueChanged<Listing> onListingTap;
   final VoidCallback onCreate;
+  final VoidCallback onPrivacyData;
 
   @override
   Widget build(BuildContext context) {
     return CustomScrollView(
       slivers: [
-        SliverToBoxAdapter(child: _FeedHeader(onCreate: onCreate)),
+        SliverToBoxAdapter(
+          child: _FeedHeader(
+            onCreate: onCreate,
+            onPrivacyData: onPrivacyData,
+          ),
+        ),
         SliverToBoxAdapter(child: _FeedFilters(viewModel: viewModel)),
         if (viewModel.visibleListings.isEmpty)
           SliverFillRemaining(
@@ -148,9 +183,13 @@ class _ReadyFeed extends StatelessWidget {
 }
 
 class _FeedHeader extends StatelessWidget {
-  const _FeedHeader({required this.onCreate});
+  const _FeedHeader({
+    required this.onCreate,
+    required this.onPrivacyData,
+  });
 
   final VoidCallback onCreate;
+  final VoidCallback onPrivacyData;
 
   @override
   Widget build(BuildContext context) {
@@ -210,10 +249,21 @@ class _FeedHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
-          FilledButton.icon(
-            onPressed: onCreate,
-            icon: const Icon(Icons.add),
-            label: const Text('Post a need or offer'),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton.icon(
+                onPressed: onCreate,
+                icon: const Icon(Icons.add),
+                label: const Text('Post a need or offer'),
+              ),
+              TextButton.icon(
+                onPressed: onPrivacyData,
+                icon: const Icon(Icons.privacy_tip_outlined),
+                label: const Text('Privacy & data'),
+              ),
+            ],
           ),
         ],
       ),
@@ -377,9 +427,13 @@ class _LoadingFeed extends StatelessWidget {
 }
 
 class _EmptyFeed extends StatelessWidget {
-  const _EmptyFeed({required this.onCreate});
+  const _EmptyFeed({
+    required this.onCreate,
+    required this.onPrivacyData,
+  });
 
   final VoidCallback onCreate;
+  final VoidCallback onPrivacyData;
 
   @override
   Widget build(BuildContext context) {
@@ -412,6 +466,12 @@ class _EmptyFeed extends StatelessWidget {
               icon: const Icon(Icons.add),
               label: const Text('Post a need or offer'),
             ),
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: onPrivacyData,
+              icon: const Icon(Icons.privacy_tip_outlined),
+              label: const Text('Privacy & data'),
+            ),
           ],
         ),
       ),
@@ -423,10 +483,12 @@ class _ErrorFeed extends StatelessWidget {
   const _ErrorFeed({
     required this.message,
     required this.onRetry,
+    required this.onPrivacyData,
   });
 
   final String message;
   final Future<void> Function() onRetry;
+  final VoidCallback onPrivacyData;
 
   @override
   Widget build(BuildContext context) {
@@ -458,6 +520,12 @@ class _ErrorFeed extends StatelessWidget {
               onPressed: onRetry,
               icon: const Icon(Icons.refresh),
               label: const Text('Retry loading listings'),
+            ),
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: onPrivacyData,
+              icon: const Icon(Icons.privacy_tip_outlined),
+              label: const Text('Privacy & data'),
             ),
           ],
         ),

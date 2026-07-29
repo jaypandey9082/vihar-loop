@@ -120,6 +120,11 @@ class _CreateRepository implements ListingRepository {
   Future<List<Listing>> fetchListings() async => const [];
 
   @override
+  Future<List<Listing>> resetLocalData() {
+    throw UnimplementedError();
+  }
+
+  @override
   Future<Listing> setSaved({
     required String listingId,
     required bool isSaved,

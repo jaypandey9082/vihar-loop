@@ -39,6 +39,16 @@ class LocalListingRepository implements ListingRepository {
   }
 
   @override
+  Future<List<Listing>> resetLocalData() {
+    return _enqueueMutation(() async {
+      await _store.deleteAllData();
+      _initialization = null;
+      await _ensureInitialized();
+      return UnmodifiableListView(await _store.readAll());
+    });
+  }
+
+  @override
   Future<Listing> createListing(ListingDraft draft) {
     return _enqueueMutation(() async {
       await _ensureInitialized();

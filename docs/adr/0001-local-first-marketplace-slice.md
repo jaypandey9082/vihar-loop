@@ -30,7 +30,8 @@ FeedScreen → FeedViewModel → ListingRepository
 ```
 
 `ListingRepository` exposes the feed read, create, and explicit Saved,
-Contacted, and Status operations. A widget-independent `ListingDraft` carries
+Contacted, Status, and `resetLocalData` operations. A widget-independent
+`ListingDraft` carries
 only user-controlled create values. The repository normalizes and revalidates
 that boundary, then constructs protected fields including a stable
 `local-<UTC microseconds>-<secure random hex>` ID, local origin, open status,
@@ -53,6 +54,11 @@ One package-generated random 32-byte key is Base64-encoded only for platform
 secure storage. Missing key material is generated once; malformed or
 inaccessible existing material fails. The encrypted box is never replaced by
 temporary memory or plaintext after failure.
+
+A dedicated widget-independent `ListingPrivacyValidator` classifies obvious
+direct-contact/payment identifiers and precise-location patterns. The create
+form and repository use the same injected validator; a future AI suggestion
+must pass it as well. It remains a heuristic guardrail, not an address parser.
 
 Seed version 1 is stored at `meta:seed_version`. Stable listing records are
 written before the marker. Hive does not provide a cross-record transaction
@@ -88,6 +94,19 @@ Flutter 3.44 `header` property and `headingLevel` for later engine behaviour.
 Focus, traversal, and live-region changes do not cross the repository or
 storage boundaries.
 
+Reset is a repository product operation, not a generic settings clear. The
+store deletes the complete named box without opening/decrypting it, then
+deletes only the matching secure-storage key. Box deletion happens first so a
+failure cannot strand ciphertext after discarding its only usable key. Normal
+initialization generates a fresh key and restores the existing nine samples;
+schema version 1 and seed version 1 do not migrate. Partial failure is
+reported and remains retryable. This is practical cryptographic reset, not
+forensic physical erasure.
+
+The release remains permission-minimal and has no product network permission.
+Screenshot blocking remains deliberately deferred because the current product
+has no credentials, payments, medical record, or private chat.
+
 ## Alternatives considered
 
 - **In-memory fallback after failure:** rejected because it would hide
@@ -106,14 +125,19 @@ storage boundaries.
   to the narrow offline boundary.
 - **Widget-built persisted listings:** rejected because protected fields,
   validation, IDs, and mutation ordering belong at the repository boundary.
+- **`box.clear()` reset:** rejected because it retains the same physical box
+  and encryption key and cannot provide the intended fresh-key recovery.
+- **Delete all secure values:** rejected because reset owns only the ViharLoop
+  database key and must preserve unrelated future secure values.
 
 ## Consequences accepted
 
 - The feed and details expose persistent private markers, and local-origin
   records expose owner-controlled Close/Reopen.
 - Local records and timestamps survive normal close/reopen with the same key.
-- Clearing data or uninstalling loses both key and listings; there is no
-  recovery, sync, or multi-device migration.
+- Clearing data or uninstalling loses both key and listings. The in-product
+  reset deliberately replaces them with a fresh key and fictional samples;
+  there is still no sync or multi-device migration.
 - Wrong-key, malformed-key, unknown-version, and corrupt-record conditions
   produce the existing retryable friendly failure state without repair.
 - Encryption reduces plaintext exposure at rest but does not protect a rooted,
@@ -123,12 +147,12 @@ storage boundaries.
 
 ## Future change points
 
-Future mutations should continue to add only workflow-backed methods. A
-user-controlled reset must deliberately remove both data
-and key with clear consequences. Schema or seed changes need explicit
+Future mutations should continue to add only workflow-backed methods. Schema or seed changes need explicit
 migrations at the codec/store boundary. A backend would reverse local-only
 trust, backup, and telemetry assumptions and requires a new ADR.
 
-Future Draft Assist may create an editable `ListingDraft`, but it must pass the
-same validator and repository path and can never persist directly. A future
-backend must also replace the current local-origin ownership assumption.
+Future Draft Assist may create an editable `ListingDraft`, but it and any
+deterministic fallback must pass `ListingPrivacyValidator` and the repository
+path and can never persist directly. A future backend must also replace the
+current local-origin ownership assumption with authenticated,
+server-authoritative validation and authorization.

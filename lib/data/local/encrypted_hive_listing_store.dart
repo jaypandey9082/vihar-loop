@@ -6,6 +6,10 @@ import 'package:vihar_loop/domain/listing.dart';
 import 'package:vihar_loop/security/encryption_key_store.dart';
 
 typedef HiveInitializer = Future<void> Function(HiveInterface hive);
+typedef HiveBoxDeleter = Future<void> Function(
+  HiveInterface hive,
+  String boxName,
+);
 
 class EncryptedHiveListingStore implements ListingLocalStore {
   EncryptedHiveListingStore({
@@ -13,11 +17,13 @@ class EncryptedHiveListingStore implements ListingLocalStore {
     ListingRecordCodec codec = const ListingRecordCodec(),
     HiveInterface? hive,
     HiveInitializer? initializeHive,
+    HiveBoxDeleter? deleteBox,
     String boxName = defaultBoxName,
   })  : _keyStore = keyStore,
         _codec = codec,
         _hive = hive ?? Hive,
         _initializeHive = initializeHive ?? _initializeFlutterHive,
+        _deleteBox = deleteBox ?? _deleteHiveBox,
         _boxName = boxName;
 
   static const defaultBoxName = 'vihar_loop_listings_v1';
@@ -29,9 +35,35 @@ class EncryptedHiveListingStore implements ListingLocalStore {
   final ListingRecordCodec _codec;
   final HiveInterface _hive;
   final HiveInitializer _initializeHive;
+  final HiveBoxDeleter _deleteBox;
   final String _boxName;
 
   Future<Box<String>>? _boxFuture;
+
+  @override
+  Future<void> deleteAllData() async {
+    _boxFuture = null;
+    try {
+      await _initializeHive(_hive);
+      await _deleteBox(_hive, _boxName);
+    } on Object catch (error) {
+      throw LocalStorageException(
+        'Encrypted local listings could not be deleted.',
+        cause: error,
+      );
+    }
+
+    try {
+      await _keyStore.deleteKey();
+    } on LocalStorageException {
+      rethrow;
+    } on Object catch (error) {
+      throw LocalStorageException(
+        'The local encryption key could not be deleted.',
+        cause: error,
+      );
+    }
+  }
 
   @override
   Future<void> seedIfRequired(List<Listing> listings) async {
@@ -245,6 +277,13 @@ class EncryptedHiveListingStore implements ListingLocalStore {
 
   static Future<void> _initializeFlutterHive(HiveInterface hive) {
     return hive.initFlutter();
+  }
+
+  static Future<void> _deleteHiveBox(
+    HiveInterface hive,
+    String boxName,
+  ) {
+    return hive.deleteBoxFromDisk(boxName);
   }
 
   Listing _decodeListingRecord(String key, Object? record) {

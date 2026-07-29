@@ -469,6 +469,162 @@ void main() {
       expect(created.map((listing) => listing.id), ['local-0', 'local-1']);
       expect(store.insertCalls, 2);
     });
+
+    test('repository repeats precise-location validation before insertion',
+        () async {
+      final store = _MemoryListingStore();
+      final repository = LocalListingRepository(
+        store: store,
+        clock: () => fixedNow,
+      );
+      const rejected = 'Flat 302, Wing B';
+
+      try {
+        await repository.createListing(
+          validDraft(
+            description: 'Collect this useful item from $rejected after class.',
+          ),
+        );
+        fail('Expected repository validation to reject the draft.');
+      } on InvalidListingDraftException catch (error) {
+        expect(error.toString(), isNot(contains(rejected)));
+      }
+      expect(store.insertCalls, 0);
+    });
+  });
+
+  group('LocalListingRepository resetLocalData', () {
+    test('deletes first and returns only fresh unmodifiable samples', () async {
+      final local = buildTestListing(
+        id: 'local-before-reset',
+        origin: ListingOrigin.local,
+        isSaved: true,
+        isContacted: true,
+        status: ListingStatus.closed,
+      );
+      final mutatedSample = buildTestListing(
+        id: 'sample-mutated',
+        origin: ListingOrigin.sample,
+        isSaved: true,
+        isContacted: true,
+        status: ListingStatus.closed,
+      );
+      final resetNow = DateTime(2026, 8, 2, 9, 30);
+      final store = _MemoryListingStore(
+        initialListings: [local, mutatedSample],
+      );
+      final repository = LocalListingRepository(
+        store: store,
+        clock: () => resetNow,
+      );
+      await repository.fetchListings();
+      store.events.clear();
+
+      final result = await repository.resetLocalData();
+
+      expect(store.events.first, 'delete');
+      expect(store.events, containsAllInOrder(['delete', 'seed', 'readAll']));
+      expect(result, hasLength(9));
+      expect(
+          result.every((item) => item.origin == ListingOrigin.sample), isTrue);
+      expect(
+          result.every((item) => !item.isSaved && !item.isContacted), isTrue);
+      expect(result.any((item) => item.id == local.id), isFalse);
+      expect(result.any((item) => item.id == mutatedSample.id), isFalse);
+      expect(
+        result.firstWhere((item) => item.id == 'sample-guitar-capo').createdAt,
+        resetNow.subtract(const Duration(minutes: 35)),
+      );
+      expect(() => result.add(result.first), throwsUnsupportedError);
+    });
+
+    test('second reset is valid and rebuilds dates with the injected clock',
+        () async {
+      var now = DateTime(2026, 8, 2, 9);
+      final store = _MemoryListingStore();
+      final repository = LocalListingRepository(
+        store: store,
+        clock: () => now,
+      );
+
+      final first = await repository.resetLocalData();
+      now = now.add(const Duration(days: 1));
+      final second = await repository.resetLocalData();
+
+      expect(store.deleteCalls, 2);
+      expect(first, hasLength(9));
+      expect(second, hasLength(9));
+      expect(
+        second.firstWhere((item) => item.id == 'sample-guitar-capo').createdAt,
+        isNot(
+          first.firstWhere((item) => item.id == 'sample-guitar-capo').createdAt,
+        ),
+      );
+    });
+
+    test('reset recovers after initialization and read failures', () async {
+      final store = _MemoryListingStore(failFirstSeed: true);
+      final repository = LocalListingRepository(
+        store: store,
+        clock: () => fixedNow,
+      );
+
+      await expectLater(repository.fetchListings(), throwsException);
+      store.failReads = true;
+
+      final reset = await repository.resetLocalData();
+
+      expect(reset, hasLength(9));
+      expect(store.deleteCalls, 1);
+      expect(store.seedCalls, 2);
+    });
+
+    test('failed reset does not poison a retry or later mutation', () async {
+      final store = _MemoryListingStore(failingDeletes: 1);
+      final repository = LocalListingRepository(
+        store: store,
+        clock: () => fixedNow,
+      );
+
+      await expectLater(repository.resetLocalData(), throwsException);
+      final reset = await repository.resetLocalData();
+      final saved = await repository.setSaved(
+        listingId: reset.first.id,
+        isSaved: true,
+      );
+
+      expect(reset, hasLength(9));
+      expect(saved.isSaved, isTrue);
+      expect(store.deleteCalls, 2);
+    });
+
+    test('reset shares mutation ordering with an earlier write', () async {
+      final original = buildTestListing(isSaved: false);
+      final updateStarted = Completer<void>();
+      final allowUpdate = Completer<void>();
+      final store = _MemoryListingStore(
+        initialListings: [original],
+        firstUpdateStarted: updateStarted,
+        firstUpdateGate: allowUpdate,
+      );
+      final repository = LocalListingRepository(
+        store: store,
+        clock: () => fixedNow,
+      );
+
+      final save = repository.setSaved(
+        listingId: original.id,
+        isSaved: true,
+      );
+      final reset = repository.resetLocalData();
+      await updateStarted.future;
+      expect(store.deleteCalls, 0);
+
+      allowUpdate.complete();
+      await save;
+      expect(await reset, hasLength(9));
+      expect(store.events, containsAllInOrder(['update', 'delete', 'seed']));
+    });
   });
 }
 
@@ -484,9 +640,11 @@ class _MemoryListingStore implements ListingLocalStore {
     this.firstInsertGate,
     int failingUpdates = 0,
     int failingInserts = 0,
+    int failingDeletes = 0,
   })  : _seeded = initialListings != null,
         _failingUpdates = failingUpdates,
         _failingInserts = failingInserts,
+        _failingDeletes = failingDeletes,
         _records = {
           for (final listing in initialListings ?? const <Listing>[])
             listing.id: listing,
@@ -504,19 +662,36 @@ class _MemoryListingStore implements ListingLocalStore {
   bool _seeded;
   int _failingUpdates;
   int _failingInserts;
+  int _failingDeletes;
   int seedCalls = 0;
   int readByIdCalls = 0;
   int updateCalls = 0;
   int insertCalls = 0;
+  int deleteCalls = 0;
   bool failReads = false;
   final List<Listing> updates = [];
   final List<Listing> inserts = [];
+  final List<String> events = [];
 
   Listing? record(String id) => _records[id];
 
   @override
+  Future<void> deleteAllData() async {
+    deleteCalls++;
+    events.add('delete');
+    if (_failingDeletes > 0) {
+      _failingDeletes--;
+      throw Exception('delete failed');
+    }
+    _records.clear();
+    _seeded = false;
+    failReads = false;
+  }
+
+  @override
   Future<void> seedIfRequired(List<Listing> listings) async {
     seedCalls++;
+    events.add('seed');
     if (failFirstSeed && seedCalls == 1) {
       throw Exception('first seed failed');
     }
@@ -536,6 +711,7 @@ class _MemoryListingStore implements ListingLocalStore {
 
   @override
   Future<List<Listing>> readAll() async {
+    events.add('readAll');
     if (failReads) {
       throw Exception('read failed');
     }
@@ -545,12 +721,14 @@ class _MemoryListingStore implements ListingLocalStore {
   @override
   Future<Listing?> readById(String id) async {
     readByIdCalls++;
+    events.add('readById');
     return _records[id];
   }
 
   @override
   Future<void> insert(Listing listing) async {
     insertCalls++;
+    events.add('insert');
     if (_failingInserts > 0) {
       _failingInserts--;
       throw Exception('insert failed');
@@ -571,6 +749,7 @@ class _MemoryListingStore implements ListingLocalStore {
   @override
   Future<void> update(Listing listing) async {
     updateCalls++;
+    events.add('update');
     if (_failingUpdates > 0) {
       _failingUpdates--;
       throw Exception('write failed');

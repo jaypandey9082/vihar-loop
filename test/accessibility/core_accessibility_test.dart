@@ -11,6 +11,7 @@ import 'package:vihar_loop/domain/listing_draft.dart';
 import 'package:vihar_loop/features/create_listing/create_listing_screen.dart';
 import 'package:vihar_loop/features/feed/listing_card.dart';
 import 'package:vihar_loop/features/listing_details/listing_details_screen.dart';
+import 'package:vihar_loop/features/privacy_data/privacy_data_screen.dart';
 
 import '../support/accessibility_test_repository.dart';
 
@@ -184,6 +185,151 @@ void main() {
         semantics.dispose();
       }
     });
+
+    testWidgets(
+        'Privacy & data opens semantically from ready, empty, and error',
+        (tester) async {
+      final semantics = tester.ensureSemantics();
+      final repositories = [
+        AccessibilityTestRepository(listings: [accessibilityListing()]),
+        AccessibilityTestRepository(),
+        AccessibilityTestRepository(fetchFailure: StateError('unreadable')),
+      ];
+      try {
+        for (final repository in repositories) {
+          await tester.pumpWidget(
+            ViharLoopApp(
+              listingRepository: repository,
+              clock: () => _now,
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          final privacy = _actionData(tester, 'Privacy & data');
+          expect(privacy.flagsCollection.isButton, isTrue);
+          expect(privacy.hasAction(SemanticsAction.tap), isTrue);
+          tester.semantics.tap(find.semantics.byLabel('Privacy & data'));
+          await tester.pumpAndSettle();
+          expect(find.text('What stays on this device'), findsOneWidget);
+
+          tester.semantics.tap(find.semantics.byLabel('Back'));
+          await tester.pumpAndSettle();
+          await tester.pumpWidget(const SizedBox());
+        }
+      } finally {
+        semantics.dispose();
+      }
+    });
+  });
+
+  group('privacy and reset semantics', () {
+    testWidgets('headings, confirmation, and pending status are coherent',
+        (tester) async {
+      final semantics = tester.ensureSemantics();
+      final pending = Completer<List<Listing>>();
+      final repository = AccessibilityTestRepository()
+        ..resetCompleter = pending;
+      try {
+        await _setSurface(tester, const Size(411, 1000));
+        await tester.pumpWidget(
+          MaterialApp(
+            home: PrivacyDataScreen(repository: repository),
+          ),
+        );
+        await tester.pumpAndSettle();
+        _expectHeading(tester, 'What stays on this device', 2);
+        _expectHeading(tester, 'What ViharLoop does not collect', 2);
+        _expectHeading(tester, 'How local protection works', 2);
+        _expectHeading(tester, 'Reset local data', 2);
+        await tester.scrollUntilVisible(
+          find.byKey(const Key('reset-local-data-button')),
+          250,
+          scrollable: find.byType(Scrollable).last,
+        );
+
+        final reset = _actionData(tester, 'Reset local data');
+        expect(reset.flagsCollection.isButton, isTrue);
+        expect(reset.hasAction(SemanticsAction.tap), isTrue);
+        tester.semantics.tap(
+          find.semantics.byLabel('Reset local data').last,
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Reset local data?'), findsOneWidget);
+        tester.semantics.tap(find.semantics.byLabel('Keep data'));
+        await tester.pumpAndSettle();
+        expect(repository.resetCount, 0);
+
+        tester.semantics.tap(
+          find.semantics.byLabel('Reset local data').last,
+        );
+        await tester.pumpAndSettle();
+        tester.semantics.tap(
+          find.semantics.byLabel('Reset local data').last,
+        );
+        await tester.pump();
+
+        final resetting = tester
+            .getSemantics(find.byKey(const Key('reset-local-data-button')))
+            .getSemanticsData();
+        expect(resetting.flagsCollection.isLiveRegion, isTrue);
+        expect(resetting.flagsCollection.isButton, isTrue);
+        expect(resetting.flagsCollection.isEnabled, Tristate.isFalse);
+        expect(resetting.hasAction(SemanticsAction.tap), isFalse);
+        expect(repository.resetCount, 1);
+
+        await tester.binding.handlePopRoute();
+        await tester.pump();
+        expect(find.text('Finishing the local-data reset…'), findsOneWidget);
+
+        pending.complete([
+          accessibilityListing(id: 'reset-sample'),
+        ]);
+        await tester.pumpAndSettle();
+      } finally {
+        semantics.dispose();
+      }
+    });
+
+    testWidgets('reset failure is visible, safe, and retryable',
+        (tester) async {
+      final semantics = tester.ensureSemantics();
+      final repository = AccessibilityTestRepository()
+        ..resetFailure = StateError('hidden key detail');
+      try {
+        await _setSurface(tester, const Size(411, 1000));
+        await tester.pumpWidget(
+          MaterialApp(
+            home: PrivacyDataScreen(repository: repository),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.scrollUntilVisible(
+          find.byKey(const Key('reset-local-data-button')),
+          250,
+          scrollable: find.byType(Scrollable).last,
+        );
+        tester.semantics.tap(
+          find.semantics.byLabel('Reset local data').last,
+        );
+        await tester.pumpAndSettle();
+        tester.semantics.tap(
+          find.semantics.byLabel('Reset local data').last,
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+            find.textContaining('finish resetting local data'), findsOneWidget);
+        expect(find.textContaining('hidden key detail'), findsNothing);
+        expect(
+          _actionData(tester, 'Reset local data').hasAction(
+            SemanticsAction.tap,
+          ),
+          isTrue,
+        );
+      } finally {
+        semantics.dispose();
+      }
+    });
   });
 
   group('create semantics and focus', () {
@@ -210,7 +356,11 @@ void main() {
         repository,
         textScaler: const TextScaler.linear(2),
       );
-      await tester.drag(find.byType(ListView), const Offset(0, -900));
+      await tester.scrollUntilVisible(
+        find.text('What are you posting?'),
+        100,
+        scrollable: find.byType(Scrollable).last,
+      );
       await tester.pumpAndSettle();
       final segmented = tester.widget<SegmentedButton<ListingKind>>(
         find.byType(SegmentedButton<ListingKind>, skipOffstage: false),
@@ -435,9 +585,21 @@ SemanticsData _data(WidgetTester tester, String label) {
 }
 
 void _expectHeading(WidgetTester tester, String label, int level) {
-  final data = _data(tester, label);
+  final data = find.semantics
+      .byLabel(label)
+      .evaluate()
+      .map((element) => element.getSemanticsData())
+      .singleWhere((data) => data.flagsCollection.isHeader);
   expect(data.flagsCollection.isHeader, isTrue);
   expect(data.headingLevel, level);
+}
+
+SemanticsData _actionData(WidgetTester tester, String label) {
+  return find.semantics
+      .byLabel(label)
+      .evaluate()
+      .map((element) => element.getSemanticsData())
+      .singleWhere((data) => data.hasAction(SemanticsAction.tap));
 }
 
 Future<void> _setSurface(WidgetTester tester, Size size) async {

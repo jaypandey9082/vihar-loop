@@ -1,11 +1,19 @@
 import 'package:vihar_loop/domain/listing_draft.dart';
+import 'package:vihar_loop/domain/listing_privacy_validator.dart';
 
 class ListingDraftValidator {
-  const ListingDraftValidator();
+  const ListingDraftValidator({
+    this.privacyValidator = const ListingPrivacyValidator(),
+  });
 
-  static const contactInformationError =
-      'Remove phone numbers, email addresses, or links. '
+  static const directContactError =
+      'Remove direct contact details, payment IDs, or links. '
       'Choose a contact preference instead.';
+  static const preciseLocationError =
+      'Use only the approximate area. Remove flat, room, floor, street, '
+      'PIN code, or map coordinates.';
+
+  final ListingPrivacyValidator privacyValidator;
 
   String? titleError(String? value) {
     final title = value?.trim() ?? '';
@@ -21,8 +29,9 @@ class ListingDraftValidator {
     if (title.contains('\n') || title.contains('\r')) {
       return 'Keep the title on one line.';
     }
-    if (_containsContactInformation(title)) {
-      return contactInformationError;
+    final privacyIssue = privacyValidator.firstIssue(title);
+    if (privacyIssue != null) {
+      return _privacyError(privacyIssue);
     }
     return null;
   }
@@ -38,8 +47,9 @@ class ListingDraftValidator {
     if (description.length > 500) {
       return 'Keep the description under 500 characters.';
     }
-    if (_containsContactInformation(description)) {
-      return contactInformationError;
+    final privacyIssue = privacyValidator.firstIssue(description);
+    if (privacyIssue != null) {
+      return _privacyError(privacyIssue);
     }
     return null;
   }
@@ -69,18 +79,11 @@ class ListingDraftValidator {
     }
   }
 
-  bool _containsContactInformation(String value) {
-    return RegExp(
-          r'(?:https?://|www\.)\S+',
-          caseSensitive: false,
-        ).hasMatch(value) ||
-        RegExp(
-          r'\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b',
-          caseSensitive: false,
-        ).hasMatch(value) ||
-        RegExp(
-          r'(?<!\d)(?:\+91[\s-]?)?[6-9]\d{4}[\s-]?\d{5}(?!\d)',
-        ).hasMatch(value);
+  String _privacyError(ListingPrivacyIssue issue) {
+    return switch (issue) {
+      ListingPrivacyIssue.directContact => directContactError,
+      ListingPrivacyIssue.preciseLocation => preciseLocationError,
+    };
   }
 }
 

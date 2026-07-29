@@ -343,6 +343,86 @@ void main() {
     viewModel.applyListingUpdate(local.copyWith(isContacted: true));
     expect(viewModel.visibleListings, hasLength(1));
   });
+
+  test('local reset replaces all records, sorts, and clears filters', () async {
+    final now = DateTime(2026, 7, 30, 12);
+    final oldLocal = _listing(
+      id: 'old-local',
+      origin: ListingOrigin.local,
+      activeUntil: now.add(const Duration(hours: 1)),
+    );
+    final later = _listing(
+      id: 'later',
+      activeUntil: now.add(const Duration(hours: 4)),
+      kind: ListingKind.offer,
+    );
+    final sooner = _listing(
+      id: 'sooner',
+      activeUntil: now.add(const Duration(hours: 2)),
+      kind: ListingKind.need,
+    );
+    final repository = _FakeListingRepository.responses([
+      [oldLocal],
+    ]);
+    final viewModel = FeedViewModel(repository: repository, clock: () => now);
+    addTearDown(viewModel.dispose);
+    await viewModel.loadListings();
+    viewModel.setKindFilter(FeedKindFilter.offers);
+    viewModel.setTimeFilter(FeedTimeFilter.endingSoon);
+
+    expect(viewModel.applyLocalDataReset([later, sooner]), isTrue);
+
+    expect(viewModel.status, FeedStatus.ready);
+    expect(viewModel.listings.map((item) => item.id), ['sooner', 'later']);
+    expect(viewModel.listings.any((item) => item.id == oldLocal.id), isFalse);
+    expect(viewModel.kindFilter, FeedKindFilter.all);
+    expect(viewModel.timeFilter, FeedTimeFilter.all);
+    expect(viewModel.message, isNull);
+    expect(repository.mutationCalls, 0);
+    expect(() => viewModel.listings.add(later), throwsUnsupportedError);
+  });
+
+  test('local reset recovers failed and genuinely empty states', () async {
+    final repository = _FakeListingRepository.responses([
+      Exception('read failed'),
+    ]);
+    final viewModel = FeedViewModel(repository: repository);
+    addTearDown(viewModel.dispose);
+    await viewModel.loadListings();
+    expect(viewModel.status, FeedStatus.failed);
+
+    expect(
+      viewModel.applyLocalDataReset([_listing(id: 'sample-reset')]),
+      isTrue,
+    );
+    expect(viewModel.status, FeedStatus.ready);
+    expect(viewModel.message, isNull);
+
+    expect(viewModel.applyLocalDataReset(const []), isTrue);
+    expect(viewModel.status, FeedStatus.empty);
+  });
+
+  test('duplicate reset identifiers are rejected without changing state',
+      () async {
+    final original = _listing(id: 'original');
+    final duplicate = _listing(id: 'duplicate');
+    final viewModel = FeedViewModel(
+      repository: _FakeListingRepository.responses([
+        [original],
+      ]),
+    );
+    addTearDown(viewModel.dispose);
+    await viewModel.loadListings();
+    var notifications = 0;
+    viewModel.addListener(() => notifications++);
+
+    expect(
+      viewModel.applyLocalDataReset([duplicate, duplicate]),
+      isFalse,
+    );
+    expect(viewModel.listings.single.id, original.id);
+    expect(notifications, 0);
+  });
 }
 
 class _FakeListingRepository implements ListingRepository {
@@ -363,6 +443,12 @@ class _FakeListingRepository implements ListingRepository {
 
   @override
   Future<Listing> createListing(ListingDraft draft) {
+    mutationCalls++;
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<List<Listing>> resetLocalData() {
     mutationCalls++;
     throw UnimplementedError();
   }

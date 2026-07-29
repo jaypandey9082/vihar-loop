@@ -24,11 +24,12 @@ Create screen
 → explicit user confirmation
 ```
 
-Draft Assist is **not implemented in Section 4**. No hosted AI will be used.
+Draft Assist is **not implemented in Section 6**. No hosted AI will be used.
 Its future suggestions will populate the editable fields on the existing
 create screen and become a `ListingDraft`. The result must still pass
-`ListingDraftValidator` in the form and repository before explicit user
-confirmation.
+`ListingDraftValidator`, including the same `ListingPrivacyValidator`, in the
+form and repository before explicit user confirmation. AI output may not
+bypass direct-contact or precise-location checks.
 
 AI will never generate the persisted ID, status, ownership/origin, creation
 time, or private markers, and it will never write to storage directly. Those
@@ -38,5 +39,7 @@ reviewed.
 
 A deterministic fallback must support the expected demo flow when the model
 is absent, still loading, incompatible, or unable to produce valid output.
-The fallback is also not implemented yet. A future `LocalAiService` remains an
-independent boundary and does not depend on the Hive persistence choice.
+It must use the same validation boundary and may not persist directly. The
+fallback is also not implemented yet. A future `LocalAiService` remains an
+independent boundary and does not depend on the Hive persistence choice. User
+confirmation remains mandatory.

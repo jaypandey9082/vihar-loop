@@ -144,6 +144,23 @@ class FeedViewModel extends ChangeNotifier {
     return true;
   }
 
+  bool applyLocalDataReset(List<Listing> listings) {
+    final identifiers = <String>{};
+    if (listings.any((listing) => !identifiers.add(listing.id))) {
+      return false;
+    }
+
+    final replacement = listings.toList()..sort(_compareListings);
+    _kindFilter = FeedKindFilter.all;
+    _timeFilter = FeedTimeFilter.all;
+    _setState(
+      status: replacement.isEmpty ? FeedStatus.empty : FeedStatus.ready,
+      listings: replacement,
+      message: null,
+    );
+    return true;
+  }
+
   // Open listings appear first, ordered by deadline, so urgent posts remain
   // discoverable. Closed posts follow in reverse creation order.
   static int _compareListings(Listing left, Listing right) {

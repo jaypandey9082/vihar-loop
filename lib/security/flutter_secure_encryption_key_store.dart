@@ -42,6 +42,15 @@ class FlutterSecureValueStore implements SecureValueStore {
       iOptions: _iosOptions,
     );
   }
+
+  @override
+  Future<void> delete(String key) {
+    return _storage.delete(
+      key: key,
+      aOptions: _androidOptions,
+      iOptions: _iosOptions,
+    );
+  }
 }
 
 class FlutterSecureEncryptionKeyStore implements EncryptionKeyStore {
@@ -56,6 +65,18 @@ class FlutterSecureEncryptionKeyStore implements EncryptionKeyStore {
 
   final SecureValueStore _valueStore;
   final EncryptionKeyGenerator _generateKey;
+
+  @override
+  Future<void> deleteKey() async {
+    try {
+      await _valueStore.delete(keyId);
+    } on Object catch (error) {
+      throw LocalStorageException(
+        'The local encryption key could not be deleted.',
+        cause: error,
+      );
+    }
+  }
 
   @override
   Future<List<int>> readOrCreateKey() async {

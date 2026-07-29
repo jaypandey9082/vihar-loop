@@ -14,11 +14,15 @@ class AccessibilityTestRepository implements ListingRepository {
   Object? fetchFailure;
   Object? createFailure;
   Object? mutationFailure;
+  Object? resetFailure;
   Completer<Listing>? createCompleter;
   Completer<Listing>? mutationCompleter;
+  Completer<List<Listing>>? resetCompleter;
+  List<Listing>? resetResult;
   int fetchCount = 0;
   int createCount = 0;
   int mutationCount = 0;
+  int resetCount = 0;
 
   List<Listing> get listings => List.unmodifiable(_listings);
 
@@ -28,6 +32,20 @@ class AccessibilityTestRepository implements ListingRepository {
     if (fetchFailure case final failure?) {
       throw failure;
     }
+    return listings;
+  }
+
+  @override
+  Future<List<Listing>> resetLocalData() async {
+    resetCount += 1;
+    if (resetFailure case final failure?) {
+      throw failure;
+    }
+    if (resetCompleter case final pending?) {
+      _listings = await pending.future;
+      return listings;
+    }
+    _listings = [...?resetResult];
     return listings;
   }
 

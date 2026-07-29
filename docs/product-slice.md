@@ -24,6 +24,7 @@ The currently implemented core workflow is:
 ```text
 Feed → create → encrypted persistence → details
      → save/contact/close/reopen → relaunch
+     → Privacy & data → reset → fictional samples
 ```
 
 Saved and Contacted are private markers stored only on this device. Contacted
@@ -53,10 +54,17 @@ over Today.
 
 The create form accepts only Need/Offer, title, description, approved category,
 broad approximate area, approved contact preference, and deadline. It has no
-exact-address, phone, or email field. Obvious phone, email, and URL text is
-rejected, and the repository revalidates before persistence. This is a
-baseline boundary rather than comprehensive address detection; broader
-privacy hardening remains later work.
+exact-address, phone, email, GPS, or live-location field. A shared deterministic
+validator rejects obvious direct-contact/payment identifiers and precise
+flat, room, floor, street, PIN-code, and coordinate patterns. The repository
+revalidates before persistence. Broad location descriptions remain allowed;
+heuristics cannot prove every free-text description is address-free.
+
+Privacy & data is reachable from normal, empty, and storage-error feeds. It
+states that there is no account, backend, analytics, or remote telemetry.
+Reset removes the encrypted database and its current key, then restores only
+the nine fictional samples with a fresh key. It therefore also recovers an
+unreadable local database without decrypting it.
 
 ## Why the product is intentionally small
 

@@ -2,11 +2,10 @@
 
 ## Scope and target
 
-Section 5 audits the existing feed, filters, cards, create form, deadline,
-details actions, dialogs, temporary messages, and route transitions. It adds no
-product feature and changes no repository, record, encryption, seed, or
-security behaviour. Android/API 36 is the primary runtime target; iOS receives
-source-level widget and guideline coverage.
+Section 5 established the core accessibility baseline. Section 6 preserves it
+and adds the Privacy & data route, reset confirmation, pending state, failure
+recovery, and feed entry points. Android/API 36 is the primary runtime target;
+iOS receives source-level widget and guideline coverage.
 
 ## Evidence
 
@@ -24,13 +23,14 @@ source-level widget and guideline coverage.
 | Contrast | Existing ColorScheme roles retained | Official text-contrast guideline passes tested light and dark states | No Accessibility Scanner or manual ratio claim | Done |
 | Traversal and keyboard | Natural widget order retained; no numeric focus order | Simulated feed/create/details/empty/dialog traversal and Tab/Shift+Tab/Enter/Space tests pass | Emulator keyboard was usable; complete Switch Access pass not performed | Done |
 | Large text and display | Segmented control measures scaled labels and becomes vertical; cards/dialogs remain flexible/scrollable | 320×568 and 568×320 at 200%, long content, form errors, pending, and dialog tests pass | API 36 at font scale 1.3 and density 560 showed vertical create choices without crash/overflow | Done |
+| Privacy & data | Route title plus level-2 headings; visible reset label; scrollable confirmation; one live pending state; retryable visible failure; Back blocked only while pending | Ready/empty/error semantic entry, heading/traversal/dialog/action/pending/failure tests; Android/iOS targets, labels, light/dark contrast, 200% portrait/landscape, and 320-pixel width pass | Full reset sequence with TalkBack gesture control remains pending | Implemented, manual verification pending |
 
 ## Automated checks
 
-The dedicated `test/accessibility/` suite contains 31 tests. It uses
+The dedicated `test/accessibility/` suite contains 38 tests. It uses
 `tester.ensureSemantics()`, official Flutter accessibility guidelines,
 `simulatedAccessibilityTraversal`, semantic actions, focus assertions, and
-logical keyboard events. The full repository suite contains 148 tests.
+logical keyboard events. The full repository suite contains 246 tests.
 
 Guideline coverage runs `androidTapTargetGuideline`,
 `iOSTapTargetGuideline`, `labeledTapTargetGuideline`, and
@@ -45,7 +45,7 @@ chip text and a scrollable dialog fixed those observed issues.
   1080×2400, physical density 420
 - TalkBack: `com.google.android.marvin.talkback`, version
   `16.0.0.738667889` (`60149341`)
-- App: ViharLoop `0.5.0` (`5`)
+- App: ViharLoop `0.6.0` (`6`)
 - Normal settings: font scale 1.0, density 420
 - Large-settings pass: font scale 1.3, override density 560
 - Display speech output: enabled for the pass
@@ -65,6 +65,10 @@ Observed, not inferred:
 - At font scale 1.3/density 560, the create Need/Offer control became vertical;
   required content remained reachable by scrolling and no app crash/ANR was
   logged.
+- Section 6 rendered the ready feed in dark theme at 200% font scale and in
+  short landscape without overflow; Privacy & data remained visibly reachable.
+- The reset page, confirmation, pending `Resetting…` state, and returned
+  nine-listing feed were visually inspected on API 36.
 
 This is representative real-emulator TalkBack evidence, not a claim that the
 entire manual acceptance script passed. ADB-injected gestures did not provide
@@ -72,8 +76,10 @@ reliable TalkBack swipe/double-tap control, the visible emulator window was not
 addressable by the available Mac automation layer, and the windowed AVD also
 encountered the previously observed System UI responsiveness issue. Therefore
 invalid-field speech, both pickers, posting, Contacted, and close-dialog speech
-remain manual verification pending. Their semantics actions, traversal,
-keyboard behaviour, states, and messages are covered automatically.
+remain manual verification pending. The Section 6 Privacy & data heading,
+dialog, pending announcement, and success SnackBar also remain pending as a
+complete TalkBack gesture flow. Their semantics actions, traversal, keyboard
+behaviour, states, and messages are covered automatically.
 
 Google Accessibility Scanner was not installed on the AVD. No random or
 unofficial APK was downloaded, so Scanner verification is unavailable.
