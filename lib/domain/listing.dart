@@ -108,4 +108,27 @@ class Listing {
   final bool isSaved;
   final bool isContacted;
   final ListingOrigin origin;
+
+  Listing copyWith({
+    bool? isSaved,
+    bool? isContacted,
+    ListingStatus? status,
+  }) {
+    return Listing(
+      id: id,
+      neighborhoodId: neighborhoodId,
+      kind: kind,
+      title: title,
+      description: description,
+      category: category,
+      approximateArea: approximateArea,
+      contactPreference: contactPreference,
+      createdAt: createdAt,
+      activeUntil: activeUntil,
+      status: status ?? this.status,
+      isSaved: isSaved ?? this.isSaved,
+      isContacted: isContacted ?? this.isContacted,
+      origin: origin,
+    );
+  }
 }

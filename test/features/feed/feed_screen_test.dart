@@ -54,7 +54,7 @@ void main() {
     expect(find.text('Closed'), findsOneWidget);
   });
 
-  testWidgets('tapping a card opens complete read-only details',
+  testWidgets('tapping a card opens complete details and local markers',
       (tester) async {
     await tester.pumpWidget(
       ViharLoopApp(
@@ -76,8 +76,81 @@ void main() {
     expect(find.text('Contact preference'), findsOneWidget);
     expect(find.text('Meet at a public place'), findsOneWidget);
     expect(find.byIcon(Icons.arrow_back), findsOneWidget);
-    expect(find.text('Save'), findsNothing);
-    expect(find.text('Contact'), findsNothing);
+    await tester.scrollUntilVisible(
+      find.text('Your activity'),
+      300,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(find.text('Your activity'), findsOneWidget);
+    expect(find.text('Save listing'), findsOneWidget);
+    expect(find.text('Mark as contacted'), findsOneWidget);
+    expect(find.text('Close listing'), findsNothing);
+  });
+
+  testWidgets('saved and contacted changes return to the feed card',
+      (tester) async {
+    final repository = _SequenceRepository([
+      [_testListing()],
+    ]);
+    await tester.pumpWidget(
+      ViharLoopApp(listingRepository: repository),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('USB-C laptop charger for two hours'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Save listing'),
+      300,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.text('Save listing'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Mark as contacted'),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.text('Mark as contacted'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.arrow_back));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Saved'), findsOneWidget);
+    expect(find.text('Contacted'), findsOneWidget);
+  });
+
+  testWidgets('card conditionally exposes all persistent markers',
+      (tester) async {
+    final semantics = tester.ensureSemantics();
+    try {
+      await tester.pumpWidget(
+        ViharLoopApp(
+          listingRepository: _SequenceRepository([
+            [
+              _testListing(
+                origin: ListingOrigin.local,
+                isSaved: true,
+                isContacted: true,
+              ),
+            ],
+          ]),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Saved'), findsOneWidget);
+      expect(find.text('Contacted'), findsOneWidget);
+      expect(find.text('Your post'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel(
+          RegExp(r'Open\. Saved\. Contacted\. Your post\. Open details'),
+        ),
+        findsOneWidget,
+      );
+    } finally {
+      semantics.dispose();
+    }
   });
 
   testWidgets('empty state is readable', (tester) async {
@@ -175,14 +248,66 @@ class _SequenceRepository implements ListingRepository {
 
   final List<Object> _responses;
   int callCount = 0;
+  List<Listing> _current = const [];
 
   @override
   Future<List<Listing>> fetchListings() async {
     final response = _responses[callCount++];
     if (response is List<Listing>) {
-      return response;
+      _current = response;
+      return _current;
     }
     throw response;
+  }
+
+  @override
+  Future<Listing> setSaved({
+    required String listingId,
+    required bool isSaved,
+  }) {
+    return _update(
+      listingId,
+      (listing) => listing.copyWith(isSaved: isSaved),
+    );
+  }
+
+  @override
+  Future<Listing> setContacted({
+    required String listingId,
+    required bool isContacted,
+  }) {
+    return _update(
+      listingId,
+      (listing) => listing.copyWith(isContacted: isContacted),
+    );
+  }
+
+  @override
+  Future<Listing> setStatus({
+    required String listingId,
+    required ListingStatus status,
+  }) {
+    return _update(listingId, (listing) {
+      if (listing.origin != ListingOrigin.local) {
+        throw const ListingStatusChangeNotAllowedException();
+      }
+      return listing.copyWith(status: status);
+    });
+  }
+
+  Future<Listing> _update(
+    String id,
+    Listing Function(Listing listing) change,
+  ) async {
+    final index = _current.indexWhere((listing) => listing.id == id);
+    if (index == -1) {
+      throw const ListingNotFoundException();
+    }
+    final updated = change(_current[index]);
+    final next = _current.toList();
+    next[index] = updated;
+    _current = next;
+    return updated;
   }
 }
 
@@ -193,6 +318,30 @@ class _PendingRepository implements ListingRepository {
 
   @override
   Future<List<Listing>> fetchListings() => result;
+
+  @override
+  Future<Listing> setSaved({
+    required String listingId,
+    required bool isSaved,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<Listing> setContacted({
+    required String listingId,
+    required bool isContacted,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<Listing> setStatus({
+    required String listingId,
+    required ListingStatus status,
+  }) {
+    throw UnimplementedError();
+  }
 }
 
 Listing _testListing({
@@ -200,6 +349,9 @@ Listing _testListing({
   String title = 'USB-C laptop charger for two hours',
   ListingKind kind = ListingKind.need,
   ListingStatus status = ListingStatus.open,
+  ListingOrigin origin = ListingOrigin.sample,
+  bool isSaved = false,
+  bool isContacted = false,
 }) {
   final now = DateTime.now();
   return Listing(
@@ -214,8 +366,8 @@ Listing _testListing({
     createdAt: now,
     activeUntil: now.add(const Duration(hours: 2)),
     status: status,
-    isSaved: false,
-    isContacted: false,
-    origin: ListingOrigin.sample,
+    isSaved: isSaved,
+    isContacted: isContacted,
+    origin: origin,
   );
 }

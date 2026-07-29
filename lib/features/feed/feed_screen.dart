@@ -64,7 +64,11 @@ class _FeedScreenState extends State<FeedScreen> {
     final listing = _viewModel.listings[index];
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (context) => ListingDetailsScreen(listing: listing),
+        builder: (context) => ListingDetailsScreen(
+          listing: listing,
+          repository: widget.repository,
+          onListingChanged: _viewModel.applyListingUpdate,
+        ),
       ),
     );
   }

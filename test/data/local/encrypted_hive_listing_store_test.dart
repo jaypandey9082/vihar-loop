@@ -8,6 +8,7 @@ import 'package:vihar_loop/data/local/listing_record_codec.dart';
 import 'package:vihar_loop/data/local/local_storage_exception.dart';
 import 'package:vihar_loop/data/local_listing_repository.dart';
 import 'package:vihar_loop/data/seed_listings.dart';
+import 'package:vihar_loop/domain/listing.dart';
 import 'package:vihar_loop/security/encryption_key_store.dart';
 
 import '../../support/listing_fixture.dart';
@@ -124,6 +125,105 @@ void main() {
       expect(rawText, isNot(contains(listing.description)));
     });
 
+    test('readById decodes a stable key and returns null for non-listings',
+        () async {
+      final listing = buildTestListing();
+      store = createStore();
+      await store!.seedIfRequired([listing]);
+
+      final restored = await store!.readById(listing.id);
+
+      expectSameListing(restored!, listing);
+      expect(await store!.readById('missing'), isNull);
+      expect(
+        await store!.readById(EncryptedHiveListingStore.seedVersionKey),
+        isNull,
+      );
+    });
+
+    test('readById rejects mismatched, malformed, and unsupported records',
+        () async {
+      const codec = ListingRecordCodec();
+      store = createStore();
+      await store!.seedIfRequired([buildTestListing()]);
+      final box = Hive.box<String>(boxName);
+
+      await box.put(
+        'listing:test-listing',
+        codec.encode(buildTestListing(id: 'different-id')),
+      );
+      await expectLater(
+        store!.readById('test-listing'),
+        throwsA(isA<LocalStorageException>()),
+      );
+
+      await box.put('listing:test-listing', '{not-json');
+      await expectLater(
+        store!.readById('test-listing'),
+        throwsA(isA<LocalStorageException>()),
+      );
+
+      final unsupported = jsonDecode(
+        codec.encode(buildTestListing()),
+      ) as Map<String, dynamic>;
+      unsupported['schemaVersion'] = 2;
+      await box.put('listing:test-listing', jsonEncode(unsupported));
+      await expectLater(
+        store!.readById('test-listing'),
+        throwsA(isA<LocalStorageException>()),
+      );
+    });
+
+    test('update replaces one complete record and preserves metadata',
+        () async {
+      final original = buildTestListing(
+        isSaved: false,
+        isContacted: false,
+      );
+      store = createStore();
+      await store!.seedIfRequired([original]);
+      final box = Hive.box<String>(boxName);
+      final keysBefore = box.keys.toSet();
+
+      final updated = original.copyWith(
+        isSaved: true,
+        isContacted: true,
+        status: ListingStatus.closed,
+      );
+      await store!.update(updated);
+      final restored = await store!.readById(original.id);
+
+      expectSameListing(restored!, updated);
+      expect(restored.title, original.title);
+      expect(restored.description, original.description);
+      expect(restored.createdAt, original.createdAt);
+      expect(restored.activeUntil, original.activeUntil);
+      expect(box.keys.toSet(), keysBefore);
+      expect(box.get(EncryptedHiveListingStore.seedVersionKey), '1');
+    });
+
+    test('update never inserts a missing or overwrites a corrupt record',
+        () async {
+      final listing = buildTestListing();
+      store = createStore();
+      await store!.seedIfRequired([listing]);
+      final box = Hive.box<String>(boxName);
+
+      final missing = buildTestListing(id: 'missing');
+      await expectLater(
+        store!.update(missing),
+        throwsA(isA<LocalStorageException>()),
+      );
+      expect(box.containsKey('listing:missing'), isFalse);
+
+      await box.put('listing:test-listing', '{corrupt');
+      await expectLater(
+        store!.update(listing.copyWith(isSaved: false)),
+        throwsA(isA<LocalStorageException>()),
+      );
+      expect(box.get('listing:test-listing'), '{corrupt');
+    });
+
     test('wrong encryption key cannot read an existing box', () async {
       store = createStore();
       await store!.seedIfRequired([buildTestListing()]);
@@ -167,6 +267,71 @@ void main() {
       expect(sameListing.createdAt, originalCreatedAt);
       expect(sameListing.activeUntil, originalActiveUntil);
       expect(sameListing.activeUntil, clockA.add(const Duration(hours: 3)));
+    });
+
+    test('repository mutations survive encrypted reopen without duplicates',
+        () async {
+      final sample = buildTestListing(
+        id: 'sample',
+        origin: ListingOrigin.sample,
+        isSaved: false,
+        isContacted: false,
+      );
+      final local = buildTestListing(
+        id: 'local',
+        origin: ListingOrigin.local,
+        isSaved: false,
+        isContacted: true,
+      );
+      store = createStore();
+      final firstRepository = LocalListingRepository(
+        store: store!,
+        clock: () => DateTime(2026, 7, 30, 8),
+      );
+      await store!.seedIfRequired([sample, local]);
+
+      await firstRepository.setSaved(listingId: sample.id, isSaved: true);
+      await firstRepository.setContacted(
+        listingId: sample.id,
+        isContacted: true,
+      );
+      await firstRepository.setStatus(
+        listingId: local.id,
+        status: ListingStatus.closed,
+      );
+      await store!.close();
+
+      store = createStore();
+      final secondRepository = LocalListingRepository(
+        store: store!,
+        clock: () => DateTime(2027, 1, 1),
+      );
+      final restored = await secondRepository.fetchListings();
+      final restoredSample =
+          restored.singleWhere((listing) => listing.id == sample.id);
+      final restoredLocal =
+          restored.singleWhere((listing) => listing.id == local.id);
+
+      expect(restored, hasLength(2));
+      expect(restored.map((listing) => listing.id).toSet(), hasLength(2));
+      expect(restoredSample.isSaved, isTrue);
+      expect(restoredSample.isContacted, isTrue);
+      expect(restoredSample.title, sample.title);
+      expect(restoredSample.createdAt, sample.createdAt);
+      expect(restoredSample.activeUntil, sample.activeUntil);
+      expect(restoredLocal.status, ListingStatus.closed);
+      expect(restoredLocal.isContacted, isTrue);
+
+      await secondRepository.setStatus(
+        listingId: local.id,
+        status: ListingStatus.open,
+      );
+      expect(
+        (await secondRepository.fetchListings())
+            .singleWhere((listing) => listing.id == local.id)
+            .status,
+        ListingStatus.open,
+      );
     });
 
     test('corrupt JSON and unknown schema fail the whole read', () async {

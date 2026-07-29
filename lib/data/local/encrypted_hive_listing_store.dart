@@ -105,16 +105,10 @@ class EncryptedHiveListingStore implements ListingLocalStore {
           );
         }
 
-        final listing = _codec.decode(box.get(key));
-        final keyId = key.substring(listingKeyPrefix.length);
+        final listing = _decodeListingRecord(key, box.get(key));
         if (!logicalIds.add(listing.id)) {
           throw const LocalStorageException(
             'Encrypted local storage contains duplicate listing identifiers.',
-          );
-        }
-        if (listing.id != keyId) {
-          throw const LocalStorageException(
-            'A local listing record does not match its storage key.',
           );
         }
         listings.add(listing);
@@ -129,6 +123,51 @@ class EncryptedHiveListingStore implements ListingLocalStore {
     }
 
     return List<Listing>.unmodifiable(listings);
+  }
+
+  @override
+  Future<Listing?> readById(String id) async {
+    final box = await _openBox();
+    final key = '$listingKeyPrefix$id';
+
+    try {
+      if (!box.containsKey(key)) {
+        return null;
+      }
+      return _decodeListingRecord(key, box.get(key));
+    } on LocalStorageException {
+      rethrow;
+    } on Object catch (error) {
+      throw LocalStorageException(
+        'The local listing could not be read.',
+        cause: error,
+      );
+    }
+  }
+
+  @override
+  Future<void> update(Listing listing) async {
+    final box = await _openBox();
+    final key = '$listingKeyPrefix${listing.id}';
+
+    try {
+      if (!box.containsKey(key)) {
+        throw const LocalStorageException(
+          'The local listing to update does not exist.',
+        );
+      }
+
+      _decodeListingRecord(key, box.get(key));
+      final record = _codec.encode(listing);
+      await box.put(key, record);
+    } on LocalStorageException {
+      rethrow;
+    } on Object catch (error) {
+      throw LocalStorageException(
+        'The local listing could not be updated.',
+        cause: error,
+      );
+    }
   }
 
   Future<void> close() async {
@@ -184,5 +223,16 @@ class EncryptedHiveListingStore implements ListingLocalStore {
 
   static Future<void> _initializeFlutterHive(HiveInterface hive) {
     return hive.initFlutter();
+  }
+
+  Listing _decodeListingRecord(String key, Object? record) {
+    final listing = _codec.decode(record);
+    final keyId = key.substring(listingKeyPrefix.length);
+    if (listing.id != keyId) {
+      throw const LocalStorageException(
+        'A local listing record does not match its storage key.',
+      );
+    }
+    return listing;
   }
 }

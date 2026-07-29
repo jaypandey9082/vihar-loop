@@ -1,6 +1,6 @@
 # Local storage note
 
-ViharLoop uses Hive CE because Section 2 has one small, flat local collection
+ViharLoop uses Hive CE because the current product has one small, flat local collection
 and no relational query requirement. Records are JSON strings rather than Hive
 objects so the domain model stays persistence-agnostic and the stored contract
 has an explicit version.
@@ -43,5 +43,12 @@ absent from raw box bytes, and a wrong key cannot normally open the box. This
 is not a formal cryptographic audit and does not protect an unlocked, rooted,
 compromised, or instrumented device.
 
-Create, save, contacted, close, reset, and migration methods are intentionally
-absent until their product workflows are implemented.
+`ListingLocalStore` now provides exact-key `readById` and `update` operations.
+Update requires an existing `listing:<id>` key, validates the current record,
+and overwrites one complete versioned encrypted record; it never upserts or
+touches seed metadata. `LocalListingRepository` serializes product mutations
+in call order, rereads the latest record inside that queue, and skips
+same-value writes. A failed mutation does not poison later work.
+
+Record schema version 1 and seed version 1 remain unchanged. Create, delete,
+user-facing reset, and migration operations remain absent.

@@ -8,23 +8,33 @@ offers without sharing an exact address.
 
 ## Current status
 
-This repository contains the Section 2 encrypted local-persistence slice. The
-existing read-only feed and listing details now load through
-`LocalListingRepository` from an encrypted Hive CE box. A random 32-byte
-database key is stored separately through FlutterSecureStorage, using Android
-Keystore and iOS Keychain on their respective platforms.
+This repository contains the Section 3 persistent-listing-interactions slice.
+The feed and listing details load through `LocalListingRepository` from an
+encrypted Hive CE box. People can save a listing and privately mark it
+contacted; successful changes update details and the feed immediately and
+survive relaunch. A random 32-byte database key is stored separately through
+FlutterSecureStorage, using Android Keystore and iOS Keychain on their
+respective platforms.
 
 - Primary demo platform: Android
 - Secondary supported shell: iOS
 - Framework: Flutter with Material 3
-- Product version: `0.2.0+2`
+- Product version: `0.3.0+3`
 - Current data: nine fictional listings seeded only when seed version 1 is absent
-- Persistence: encrypted Hive CE behind the unchanged `ListingRepository`
+- Persistence: complete versioned records in encrypted Hive CE
 - Key storage: FlutterSecureStorage, with no key in source or the Hive box
-- UI scope: read-only feed and details; listing mutations remain planned
+- UI scope: feed, details, private Saved/Contacted markers, and owner-controlled
+  Close/Reopen
+
+Saved and Contacted are local device markers. Mark Contacted does not send a
+message. Close/Reopen is available only for records whose origin is `local`;
+the repository enforces that rule rather than relying on a hidden button.
+Production seeds remain `sample` origin, so Close first becomes visible in the
+live product after Section 4 adds creation of a real local listing.
 
 Direct storage dependencies resolve to `hive_ce 2.19.3`,
 `hive_ce_flutter 2.3.4`, and `flutter_secure_storage 10.3.1`.
+Section 3 added or upgraded no dependency.
 
 ## Requirements
 
@@ -62,7 +72,7 @@ lib/
   domain/               Listing and neighbourhood model
   features/feed/        Feed view, view model, and listing card
   features/listing_details/
-                        Read-only details view
+                        Details view and mutation view model
   security/             Secure-storage encryption-key lifecycle
 test/                   Codec, key, store, repository, UI, semantics tests
 docs/                   Product, metrics, accessibility, security, AI, demo
@@ -87,12 +97,12 @@ secure storage, or seed data.
 
 ## Intended three-minute workflow
 
-The final product demo is planned to run in airplane mode: open the
-Vidyavihar feed, find an urgent post, inspect its details, save or mark it
-contacted, create a new listing with editable on-device Draft Assist, relaunch
-to prove local persistence, and close the listing. Section 2 demonstrates the
-read-only feed and details plus encrypted first-run seeding and persistence
-across relaunch.
+The final product demo is planned to run in airplane mode: open the Vidyavihar
+feed, find an urgent post, inspect its details, save or mark it contacted,
+create a new listing with editable on-device Draft Assist, relaunch to prove
+local persistence, and close the listing. Section 3 demonstrates the feed and
+details, encrypted persistence, immediate Saved/Contacted coordination, and
+repository-enforced owner-only status changes.
 
 Deleting ViharLoop or clearing its app data removes both the local encryption
 key and listings. Android backup and device transfer are intentionally
@@ -100,10 +110,10 @@ disabled for this local-only slice.
 
 ## Known gaps
 
-Section 2 does not yet include:
+Section 3 does not yet include:
 
 - Create listing
-- Save, contacted, or closed mutations
+- A real local-origin listing visible in production
 - User-facing local-data reset
 - Full privacy validation
 - Today Loop or Ending Soon filters

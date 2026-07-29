@@ -22,6 +22,9 @@ class ListingCard extends StatelessWidget {
       listing.approximateArea.label,
       '${listing.kind.activeUntilLabel} $time',
       listing.status.label,
+      if (listing.isSaved) 'Saved',
+      if (listing.isContacted) 'Contacted',
+      if (listing.origin == ListingOrigin.local) 'Your post',
       'Open details',
     ].join('. ');
 
@@ -55,6 +58,21 @@ class ListingCard extends StatelessWidget {
                             : Icons.check_circle_outline,
                         text: listing.status.label,
                       ),
+                      if (listing.isSaved)
+                        const _Label(
+                          icon: Icons.bookmark,
+                          text: 'Saved',
+                        ),
+                      if (listing.isContacted)
+                        const _Label(
+                          icon: Icons.forum_outlined,
+                          text: 'Contacted',
+                        ),
+                      if (listing.origin == ListingOrigin.local)
+                        const _Label(
+                          icon: Icons.person_outline,
+                          text: 'Your post',
+                        ),
                     ],
                   ),
                   const SizedBox(height: 12),

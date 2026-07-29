@@ -96,6 +96,93 @@ void main() {
     expect(viewModel.status, FeedStatus.ready);
     expect(viewModel.listings.single.id, 'recovered');
   });
+
+  test('applies saved and contacted updates without changing other listings',
+      () async {
+    final first = _listing(id: 'first');
+    final other = _listing(id: 'other');
+    final repository = _FakeListingRepository.responses([
+      [first, other],
+    ]);
+    final viewModel = FeedViewModel(repository: repository);
+    addTearDown(viewModel.dispose);
+    await viewModel.loadListings();
+
+    expect(viewModel.applyListingUpdate(first.copyWith(isSaved: true)), isTrue);
+    expect(
+      viewModel.applyListingUpdate(
+        first.copyWith(isSaved: true, isContacted: true),
+      ),
+      isTrue,
+    );
+
+    final updated =
+        viewModel.listings.singleWhere((listing) => listing.id == first.id);
+    final unchanged =
+        viewModel.listings.singleWhere((listing) => listing.id == other.id);
+    expect(updated.isSaved, isTrue);
+    expect(updated.isContacted, isTrue);
+    expect(identical(unchanged, other), isTrue);
+    expect(viewModel.status, FeedStatus.ready);
+    expect(() => viewModel.listings.add(first), throwsUnsupportedError);
+    expect(repository.mutationCalls, 0);
+  });
+
+  test('closing and reopening reapply the existing feed ordering', () async {
+    final now = DateTime(2026, 7, 30, 12);
+    final urgent = _listing(
+      id: 'urgent',
+      activeUntil: now.add(const Duration(hours: 1)),
+      origin: ListingOrigin.local,
+    );
+    final later = _listing(
+      id: 'later',
+      activeUntil: now.add(const Duration(hours: 4)),
+    );
+    final viewModel = FeedViewModel(
+      repository: _FakeListingRepository.responses([
+        [later, urgent],
+      ]),
+    );
+    addTearDown(viewModel.dispose);
+    await viewModel.loadListings();
+
+    expect(
+        viewModel.listings.map((listing) => listing.id), ['urgent', 'later']);
+
+    viewModel.applyListingUpdate(
+      urgent.copyWith(status: ListingStatus.closed),
+    );
+    expect(
+        viewModel.listings.map((listing) => listing.id), ['later', 'urgent']);
+
+    viewModel.applyListingUpdate(urgent.copyWith(status: ListingStatus.open));
+    expect(
+        viewModel.listings.map((listing) => listing.id), ['urgent', 'later']);
+  });
+
+  test('unknown and identical updates do not change or notify', () async {
+    final listing = _listing(id: 'known');
+    final viewModel = FeedViewModel(
+      repository: _FakeListingRepository.responses([
+        [listing],
+      ]),
+    );
+    addTearDown(viewModel.dispose);
+    await viewModel.loadListings();
+    var notifications = 0;
+    viewModel.addListener(() => notifications++);
+
+    expect(
+      viewModel.applyListingUpdate(_listing(id: 'unknown')),
+      isFalse,
+    );
+    expect(viewModel.applyListingUpdate(listing.copyWith()), isFalse);
+
+    expect(viewModel.listings, hasLength(1));
+    expect(viewModel.listings.single.id, 'known');
+    expect(notifications, 0);
+  });
 }
 
 class _FakeListingRepository implements ListingRepository {
@@ -103,6 +190,7 @@ class _FakeListingRepository implements ListingRepository {
 
   final List<Object> _responses;
   int callCount = 0;
+  int mutationCalls = 0;
 
   @override
   Future<List<Listing>> fetchListings() async {
@@ -112,12 +200,40 @@ class _FakeListingRepository implements ListingRepository {
     }
     throw response;
   }
+
+  @override
+  Future<Listing> setSaved({
+    required String listingId,
+    required bool isSaved,
+  }) async {
+    mutationCalls++;
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<Listing> setContacted({
+    required String listingId,
+    required bool isContacted,
+  }) async {
+    mutationCalls++;
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<Listing> setStatus({
+    required String listingId,
+    required ListingStatus status,
+  }) async {
+    mutationCalls++;
+    throw UnimplementedError();
+  }
 }
 
 Listing _listing({
   required String id,
   DateTime? activeUntil,
   ListingStatus status = ListingStatus.open,
+  ListingOrigin origin = ListingOrigin.sample,
 }) {
   final createdAt = DateTime(2026, 7, 28, 12);
   return Listing(
@@ -134,6 +250,6 @@ Listing _listing({
     status: status,
     isSaved: false,
     isContacted: false,
-    origin: ListingOrigin.sample,
+    origin: origin,
   );
 }

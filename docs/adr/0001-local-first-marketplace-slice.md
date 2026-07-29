@@ -29,10 +29,12 @@ FeedScreen → FeedViewModel → ListingRepository
                        FlutterSecureStorage
 ```
 
-`ListingRepository` remains read-only and exposes only `fetchListings()`.
-`LocalListingRepository` coordinates one retryable first-run initialization.
-The store lazily opens and retains one encrypted `Box<String>` named
-`vihar_loop_listings_v1`.
+`ListingRepository` exposes the feed read plus explicit Saved, Contacted, and
+Status operations. `LocalListingRepository` coordinates retryable first-run
+initialization, serializes mutations, rereads the latest value, and owns the
+product rule that sample listings cannot change status. The store lazily opens
+one encrypted `Box<String>` named `vihar_loop_listings_v1` and owns exact-key
+reads plus complete-record replacement without upsert.
 
 Listing values are explicit schema-version-1 JSON records. Stable text codes,
 UTC ISO-8601 timestamps, complete validation, and matching `listing:<id>` keys
@@ -61,6 +63,12 @@ because restoring the encrypted box without its secure key produces unusable
 data. iOS uses device-bound, non-synchronizing Keychain accessibility and
 committed Keychain entitlements.
 
+The UI never treats an optimistic copy as persisted. A details view model
+receives an immutable result from the repository, updates the visible listing
+only after storage succeeds, and sends that result back to the feed. Local
+origin is sufficient for this offline slice; future server identity and
+ownership checks must be server-authoritative.
+
 ## Alternatives considered
 
 - **In-memory fallback after failure:** rejected because it would hide
@@ -80,7 +88,8 @@ committed Keychain entitlements.
 
 ## Consequences accepted
 
-- The feed and details keep their Section 1 appearance and behavior.
+- The feed and details expose persistent private markers, and local-origin
+  records expose owner-controlled Close/Reopen.
 - Local records and timestamps survive normal close/reopen with the same key.
 - Clearing data or uninstalling loses both key and listings; there is no
   recovery, sync, or multi-device migration.
@@ -93,8 +102,8 @@ committed Keychain entitlements.
 
 ## Future change points
 
-Listing mutations should add only workflow-backed methods to the repository
-and local store. A user-controlled reset must deliberately remove both data
+Future mutations should continue to add only workflow-backed methods. A
+user-controlled reset must deliberately remove both data
 and key with clear consequences. Schema or seed changes need explicit
 migrations at the codec/store boundary. A backend would reverse local-only
 trust, backup, and telemetry assumptions and requires a new ADR.

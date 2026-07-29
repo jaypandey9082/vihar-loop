@@ -1,6 +1,6 @@
 # Security baseline
 
-Section 2 remains local-only: there is no backend, HTTP client, authentication,
+Section 3 remains local-only: there is no backend, HTTP client, authentication,
 analytics, telemetry, or hosted-service secret. Listing data uses broad
 Vidyavihar areas and does not contain an exact address.
 
@@ -21,6 +21,16 @@ synchronized through iCloud.
 ### 2. Client/server trust boundary
 
 There is still no server. All records are local fictional product data.
+Saved and Contacted are encrypted device-local markers, and marking Contacted
+sends no communication off the device. No permission, telemetry, or personal
+data field was added.
+
+UI visibility is not an authorization boundary: the repository rejects status
+mutation for sample-origin records and permits it only for local-origin
+records. That local-origin rule is suitable only for this offline slice. A
+future server must determine ownership from authenticated, server-authoritative
+identity rather than trusting a client field.
+
 Client-side flags must not become authoritative for future identity, payment,
 permission, or moderation decisions. A future server needs independent
 authentication, authorization, and input validation.
@@ -66,6 +76,6 @@ iOS Debug/Profile and Release entitlements declare Keychain access. Source
 configuration is validated, but runtime Keychain behavior remains unverified
 because full Xcode is unavailable.
 
-Section 2 has schema and seed version 1 but no migration framework. A future
+Section 3 retains schema and seed version 1 and has no migration framework. A future
 schema change needs an explicit, tested migration or repair path; corruption
 must not be hidden by reseeding.
