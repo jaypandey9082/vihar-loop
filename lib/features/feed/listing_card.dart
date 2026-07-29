@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:vihar_loop/domain/listing.dart';
+import 'package:vihar_loop/domain/listing_timing.dart';
 import 'package:vihar_loop/features/listing_time_text.dart';
 
 class ListingCard extends StatelessWidget {
   const ListingCard({
     required this.listing,
+    required this.timeBadge,
     required this.onTap,
     super.key,
   });
 
   final Listing listing;
+  final ListingTimeBadge timeBadge;
   final VoidCallback onTap;
 
   @override
@@ -22,6 +25,8 @@ class ListingCard extends StatelessWidget {
       listing.approximateArea.label,
       '${listing.kind.activeUntilLabel} $time',
       listing.status.label,
+      if (timeBadge == ListingTimeBadge.endingSoon) 'Ending soon',
+      if (timeBadge == ListingTimeBadge.today) 'Today',
       if (listing.isSaved) 'Saved',
       if (listing.isContacted) 'Contacted',
       if (listing.origin == ListingOrigin.local) 'Your post',
@@ -52,6 +57,16 @@ class ListingCard extends StatelessWidget {
                         text: listing.kind.label,
                         emphasized: true,
                       ),
+                      if (timeBadge == ListingTimeBadge.endingSoon)
+                        const _Label(
+                          icon: Icons.timer_outlined,
+                          text: 'Ending soon',
+                        )
+                      else if (timeBadge == ListingTimeBadge.today)
+                        const _Label(
+                          icon: Icons.today_outlined,
+                          text: 'Today',
+                        ),
                       _Label(
                         icon: listing.status == ListingStatus.open
                             ? Icons.radio_button_checked

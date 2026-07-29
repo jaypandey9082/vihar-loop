@@ -1,26 +1,67 @@
 import 'dart:collection';
 
 import 'package:flutter/foundation.dart';
+import 'package:vihar_loop/core/clock.dart';
 import 'package:vihar_loop/data/listing_repository.dart';
 import 'package:vihar_loop/domain/listing.dart';
+import 'package:vihar_loop/domain/listing_timing.dart';
 
 enum FeedStatus { initial, loading, ready, empty, failed }
 
+enum FeedKindFilter { all, needs, offers }
+
+enum FeedTimeFilter { all, today, endingSoon }
+
 class FeedViewModel extends ChangeNotifier {
-  FeedViewModel({required ListingRepository repository})
-      : _repository = repository;
+  FeedViewModel({
+    required ListingRepository repository,
+    Clock? clock,
+  })  : _repository = repository,
+        _clock = clock ?? DateTime.now;
 
   static const failureMessage =
       'We couldn’t load the local listings. Try again.';
 
   final ListingRepository _repository;
+  final Clock _clock;
   List<Listing> _listings = const [];
   FeedStatus _status = FeedStatus.initial;
   String? _message;
+  FeedKindFilter _kindFilter = FeedKindFilter.all;
+  FeedTimeFilter _timeFilter = FeedTimeFilter.all;
 
   FeedStatus get status => _status;
   UnmodifiableListView<Listing> get listings => UnmodifiableListView(_listings);
+  UnmodifiableListView<Listing> get visibleListings {
+    final now = _clock();
+    return UnmodifiableListView(
+      _listings.where((listing) {
+        final kindMatches = switch (_kindFilter) {
+          FeedKindFilter.all => true,
+          FeedKindFilter.needs => listing.kind == ListingKind.need,
+          FeedKindFilter.offers => listing.kind == ListingKind.offer,
+        };
+        final timeMatches = switch (_timeFilter) {
+          FeedTimeFilter.all => true,
+          FeedTimeFilter.today => listingIsToday(listing, now),
+          FeedTimeFilter.endingSoon => listingIsEndingSoon(listing, now),
+        };
+        return kindMatches && timeMatches;
+      }),
+    );
+  }
+
   String? get message => _message;
+  FeedKindFilter get kindFilter => _kindFilter;
+  FeedTimeFilter get timeFilter => _timeFilter;
+  int get totalCount => _listings.length;
+  int get visibleCount => visibleListings.length;
+  bool get hasActiveFilters =>
+      _kindFilter != FeedKindFilter.all || _timeFilter != FeedTimeFilter.all;
+
+  ListingTimeBadge timeBadgeFor(Listing listing) {
+    return listingTimeBadge(listing, _clock());
+  }
 
   Future<void> loadListings() async {
     _setState(status: FeedStatus.loading, listings: const [], message: null);
@@ -44,6 +85,47 @@ class FeedViewModel extends ChangeNotifier {
   }
 
   Future<void> retry() => loadListings();
+
+  void setKindFilter(FeedKindFilter value) {
+    if (_kindFilter == value) {
+      return;
+    }
+    _kindFilter = value;
+    notifyListeners();
+  }
+
+  void setTimeFilter(FeedTimeFilter value) {
+    if (_timeFilter == value) {
+      return;
+    }
+    _timeFilter = value;
+    notifyListeners();
+  }
+
+  void clearFilters() {
+    if (!hasActiveFilters) {
+      return;
+    }
+    _kindFilter = FeedKindFilter.all;
+    _timeFilter = FeedTimeFilter.all;
+    notifyListeners();
+  }
+
+  bool addCreatedListing(Listing listing) {
+    if (listing.origin != ListingOrigin.local ||
+        _listings.any((current) => current.id == listing.id)) {
+      return false;
+    }
+    final updated = [..._listings, listing]..sort(_compareListings);
+    _kindFilter = FeedKindFilter.all;
+    _timeFilter = FeedTimeFilter.all;
+    _setState(
+      status: FeedStatus.ready,
+      listings: updated,
+      message: null,
+    );
+    return true;
+  }
 
   bool applyListingUpdate(Listing listing) {
     if (_status != FeedStatus.ready) {

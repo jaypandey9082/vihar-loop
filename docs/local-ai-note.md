@@ -24,15 +24,19 @@ Create screen
 → explicit user confirmation
 ```
 
-Draft Assist is **not implemented in Section 3**. No hosted AI will be used.
-Model output will never publish directly; it must pass strict field and enum
-validation, remain editable, and require explicit confirmation. Model files
-will not be casually committed to Git and their licensing and distribution
-requirements must be reviewed.
+Draft Assist is **not implemented in Section 4**. No hosted AI will be used.
+Its future suggestions will populate the editable fields on the existing
+create screen and become a `ListingDraft`. The result must still pass
+`ListingDraftValidator` in the form and repository before explicit user
+confirmation.
+
+AI will never generate the persisted ID, status, ownership/origin, creation
+time, or private markers, and it will never write to storage directly. Those
+protected values remain repository-owned. Model files will not be casually
+committed to Git and their licensing and distribution requirements must be
+reviewed.
 
 A deterministic fallback must support the expected demo flow when the model
 is absent, still loading, incompatible, or unable to produce valid output.
 The fallback is also not implemented yet. A future `LocalAiService` remains an
 independent boundary and does not depend on the Hive persistence choice.
-Section 3 listing interactions likewise remain independent from that future
-service.

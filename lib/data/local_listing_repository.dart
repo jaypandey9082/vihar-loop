@@ -1,22 +1,33 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:math';
 
+import 'package:vihar_loop/core/clock.dart';
 import 'package:vihar_loop/data/listing_repository.dart';
 import 'package:vihar_loop/data/local/listing_local_store.dart';
 import 'package:vihar_loop/data/seed_listings.dart';
 import 'package:vihar_loop/domain/listing.dart';
+import 'package:vihar_loop/domain/listing_draft.dart';
+import 'package:vihar_loop/domain/listing_draft_validator.dart';
+import 'package:vihar_loop/domain/neighborhood.dart';
 
-typedef Clock = DateTime Function();
+typedef ListingIdGenerator = String Function(DateTime now);
 
 class LocalListingRepository implements ListingRepository {
   LocalListingRepository({
     required ListingLocalStore store,
     Clock? clock,
+    ListingDraftValidator validator = const ListingDraftValidator(),
+    ListingIdGenerator? idGenerator,
   })  : _store = store,
-        _clock = clock ?? DateTime.now;
+        _clock = clock ?? DateTime.now,
+        _validator = validator,
+        _idGenerator = idGenerator ?? _generateListingId;
 
   final ListingLocalStore _store;
   final Clock _clock;
+  final ListingDraftValidator _validator;
+  final ListingIdGenerator _idGenerator;
 
   Future<void>? _initialization;
   Future<void> _mutationTail = Future<void>.value();
@@ -25,6 +36,35 @@ class LocalListingRepository implements ListingRepository {
   Future<List<Listing>> fetchListings() async {
     await _ensureInitialized();
     return UnmodifiableListView(await _store.readAll());
+  }
+
+  @override
+  Future<Listing> createListing(ListingDraft draft) {
+    return _enqueueMutation(() async {
+      await _ensureInitialized();
+      final now = _clock();
+      final normalized = draft.normalized();
+      _validator.validateOrThrow(normalized, now);
+
+      final listing = Listing(
+        id: _idGenerator(now),
+        neighborhoodId: Neighborhood.vidyavihar.id,
+        kind: normalized.kind,
+        title: normalized.title,
+        description: normalized.description,
+        category: normalized.category,
+        approximateArea: normalized.approximateArea,
+        contactPreference: normalized.contactPreference,
+        createdAt: now,
+        activeUntil: normalized.activeUntil,
+        status: ListingStatus.open,
+        isSaved: false,
+        isContacted: false,
+        origin: ListingOrigin.local,
+      );
+      await _store.insert(listing);
+      return listing;
+    });
   }
 
   @override
@@ -128,5 +168,14 @@ class LocalListingRepository implements ListingRepository {
     });
 
     return result.future;
+  }
+
+  static String _generateListingId(DateTime now) {
+    final random = Random.secure();
+    final suffix = List.generate(
+      2,
+      (_) => random.nextInt(0x100000000).toRadixString(16).padLeft(8, '0'),
+    ).join();
+    return 'local-${now.toUtc().microsecondsSinceEpoch}-$suffix';
   }
 }

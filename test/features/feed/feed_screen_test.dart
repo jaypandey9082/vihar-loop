@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vihar_loop/app/vihar_loop_app.dart';
 import 'package:vihar_loop/data/listing_repository.dart';
 import 'package:vihar_loop/domain/listing.dart';
+import 'package:vihar_loop/domain/listing_draft.dart';
 import 'package:vihar_loop/features/feed/feed_screen.dart';
 import 'package:vihar_loop/features/feed/feed_view_model.dart';
 
@@ -50,6 +51,7 @@ void main() {
     expect(find.text('USB-C laptop charger for two hours'), findsOneWidget);
     expect(find.text('Need'), findsOneWidget);
     expect(find.text('Open'), findsOneWidget);
+    await _showFeedListing(tester, 'Scientific calculator available');
     expect(find.text('Offer'), findsOneWidget);
     expect(find.text('Closed'), findsOneWidget);
   });
@@ -65,6 +67,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await _showFeedListing(tester, 'USB-C laptop charger for two hours');
     await tester.tap(find.text('USB-C laptop charger for two hours'));
     await tester.pumpAndSettle();
 
@@ -97,6 +100,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await _showFeedListing(tester, 'USB-C laptop charger for two hours');
     await tester.tap(find.text('USB-C laptop charger for two hours'));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
@@ -139,12 +143,16 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await _showFeedListing(tester, 'USB-C laptop charger for two hours');
       expect(find.text('Saved'), findsOneWidget);
       expect(find.text('Contacted'), findsOneWidget);
       expect(find.text('Your post'), findsOneWidget);
       expect(
         find.bySemanticsLabel(
-          RegExp(r'Open\. Saved\. Contacted\. Your post\. Open details'),
+          RegExp(
+            r'Open\. Ending soon\. Saved\. Contacted\. Your post\. '
+            r'Open details',
+          ),
         ),
         findsOneWidget,
       );
@@ -203,11 +211,12 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await _showFeedListing(tester, 'USB-C laptop charger for two hours');
       expect(
         find.bySemanticsLabel(
           RegExp(
             r'Need\. USB-C laptop charger for two hours\. Electronics\. '
-            r'Somaiya side\. Needed by .+\. Open\. Open details',
+            r'Somaiya side\. Needed by .+\. Open\. Ending soon\. Open details',
           ),
         ),
         findsOneWidget,
@@ -241,6 +250,136 @@ void main() {
     expect(find.text('Nearby needs and offers'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('create returns a local listing and exposes owner controls',
+      (tester) async {
+    final now = DateTime(2026, 7, 30, 12);
+    final repository = _SequenceRepository([
+      [_testListing()],
+    ]);
+    await tester.pumpWidget(
+      ViharLoopApp(
+        listingRepository: repository,
+        clock: () => now,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Post a need or offer'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byType(TextFormField).first,
+      'Foldable music stand for rehearsal',
+    );
+    await tester.enterText(
+      find.byType(TextFormField).last,
+      'A foldable stand would help our rehearsal tonight.',
+    );
+    await _selectDropdown<ListingCategory>(
+      tester,
+      'Music, hobbies & sports',
+    );
+    await _selectDropdown<ApproximateArea>(tester, 'Somaiya side');
+    await _selectDropdown<ContactPreference>(
+      tester,
+      'Meet at a public place',
+    );
+    await tester.scrollUntilVisible(
+      find.text('Choose date and time'),
+      300,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.text('Choose date and time'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Post need'),
+      300,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.text('Post need'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Listing posted on this device.'), findsOneWidget);
+    await _showFeedListing(tester, 'Foldable music stand for rehearsal');
+    expect(find.text('Your post'), findsOneWidget);
+    expect(
+      repository.current
+          .where((listing) => listing.id == 'local-widget-created'),
+      hasLength(1),
+    );
+
+    await tester.tap(find.text('Foldable music stand for rehearsal'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Close listing'),
+      300,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(find.text('Close listing'), findsOneWidget);
+  });
+
+  testWidgets('filtered cards navigate by Listing rather than source index',
+      (tester) async {
+    final repository = _SequenceRepository([
+      [
+        _testListing(id: 'first-need', title: 'First complete-list need'),
+        _testListing(
+          id: 'filtered-offer',
+          title: 'Filtered offer card',
+          kind: ListingKind.offer,
+        ),
+        _testListing(id: 'third-need', title: 'Third complete-list need'),
+      ],
+    ]);
+    await tester.pumpWidget(
+      ViharLoopApp(listingRepository: repository),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Offers'));
+    await tester.pumpAndSettle();
+    await _showFeedListing(tester, 'Filtered offer card');
+    expect(find.text('First complete-list need'), findsNothing);
+    await tester.tap(find.text('Filtered offer card'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Listing details'), findsOneWidget);
+    expect(find.text('Filtered offer card'), findsOneWidget);
+    expect(find.text('First complete-list need'), findsNothing);
+  });
+}
+
+Future<void> _selectDropdown<T>(
+  WidgetTester tester,
+  String option,
+) async {
+  final label = T == ListingCategory
+      ? 'Category'
+      : T == ApproximateArea
+          ? 'Approximate area'
+          : 'Contact preference';
+  await tester.scrollUntilVisible(
+    find.text(label),
+    300,
+    scrollable: find.byType(Scrollable).last,
+  );
+  await tester.tap(find.byType(DropdownButtonFormField<T>));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(option).last);
+  await tester.pumpAndSettle();
+}
+
+Future<void> _showFeedListing(WidgetTester tester, String title) async {
+  await tester.scrollUntilVisible(
+    find.text(title),
+    300,
+    scrollable: find.byType(Scrollable).first,
+  );
+  await tester.pumpAndSettle();
 }
 
 class _SequenceRepository implements ListingRepository {
@@ -249,6 +388,7 @@ class _SequenceRepository implements ListingRepository {
   final List<Object> _responses;
   int callCount = 0;
   List<Listing> _current = const [];
+  List<Listing> get current => List.unmodifiable(_current);
 
   @override
   Future<List<Listing>> fetchListings() async {
@@ -258,6 +398,28 @@ class _SequenceRepository implements ListingRepository {
       return _current;
     }
     throw response;
+  }
+
+  @override
+  Future<Listing> createListing(ListingDraft draft) async {
+    final created = Listing(
+      id: 'local-widget-created',
+      neighborhoodId: 'vidyavihar',
+      kind: draft.kind,
+      title: draft.title.trim(),
+      description: draft.description.trim(),
+      category: draft.category,
+      approximateArea: draft.approximateArea,
+      contactPreference: draft.contactPreference,
+      createdAt: draft.activeUntil.subtract(const Duration(hours: 2)),
+      activeUntil: draft.activeUntil,
+      status: ListingStatus.open,
+      isSaved: false,
+      isContacted: false,
+      origin: ListingOrigin.local,
+    );
+    _current = [..._current, created];
+    return created;
   }
 
   @override
@@ -318,6 +480,11 @@ class _PendingRepository implements ListingRepository {
 
   @override
   Future<List<Listing>> fetchListings() => result;
+
+  @override
+  Future<Listing> createListing(ListingDraft draft) {
+    throw UnimplementedError();
+  }
 
   @override
   Future<Listing> setSaved({

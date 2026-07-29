@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vihar_loop/data/listing_repository.dart';
 import 'package:vihar_loop/domain/listing.dart';
+import 'package:vihar_loop/domain/listing_draft.dart';
 import 'package:vihar_loop/features/listing_details/listing_details_view_model.dart';
 
 import '../../support/listing_fixture.dart';
@@ -202,6 +203,11 @@ class _DetailsRepository implements ListingRepository {
 
   @override
   Future<List<Listing>> fetchListings() async => [current];
+
+  @override
+  Future<Listing> createListing(ListingDraft draft) {
+    throw UnimplementedError();
+  }
 
   @override
   Future<Listing> setSaved({

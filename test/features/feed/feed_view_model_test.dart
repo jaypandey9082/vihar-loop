@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vihar_loop/data/listing_repository.dart';
 import 'package:vihar_loop/domain/listing.dart';
+import 'package:vihar_loop/domain/listing_draft.dart';
 import 'package:vihar_loop/features/feed/feed_view_model.dart';
 
 void main() {
@@ -183,6 +184,165 @@ void main() {
     expect(viewModel.listings.single.id, 'known');
     expect(notifications, 0);
   });
+
+  test('kind and time filters combine without changing source or fetching',
+      () async {
+    final now = DateTime(2026, 7, 30, 12);
+    final needSoon = _listing(
+      id: 'need-soon',
+      activeUntil: now.add(const Duration(hours: 2)),
+    );
+    final offerToday = _listing(
+      id: 'offer-today',
+      kind: ListingKind.offer,
+      activeUntil: DateTime(2026, 7, 30, 20),
+    );
+    final needTomorrow = _listing(
+      id: 'need-tomorrow',
+      activeUntil: DateTime(2026, 7, 31, 10),
+    );
+    final closed = _listing(
+      id: 'closed',
+      activeUntil: now.add(const Duration(hours: 1)),
+      status: ListingStatus.closed,
+    );
+    final past = _listing(
+      id: 'past',
+      activeUntil: now.subtract(const Duration(hours: 1)),
+    );
+    final repository = _FakeListingRepository.responses([
+      [needTomorrow, closed, offerToday, past, needSoon],
+    ]);
+    final viewModel = FeedViewModel(
+      repository: repository,
+      clock: () => now,
+    );
+    addTearDown(viewModel.dispose);
+    await viewModel.loadListings();
+    final sourceIds = viewModel.listings.map((listing) => listing.id).toList();
+
+    viewModel.setKindFilter(FeedKindFilter.needs);
+    expect(
+      viewModel.visibleListings.map((listing) => listing.id),
+      containsAll(['need-soon', 'need-tomorrow', 'closed', 'past']),
+    );
+    viewModel.setTimeFilter(FeedTimeFilter.today);
+    expect(
+      viewModel.visibleListings.map((listing) => listing.id),
+      ['need-soon'],
+    );
+    viewModel.setKindFilter(FeedKindFilter.offers);
+    expect(
+      viewModel.visibleListings.map((listing) => listing.id),
+      ['offer-today'],
+    );
+    viewModel.setTimeFilter(FeedTimeFilter.endingSoon);
+    expect(viewModel.visibleListings, isEmpty);
+    expect(viewModel.status, FeedStatus.ready);
+    expect(viewModel.totalCount, 5);
+    expect(viewModel.visibleCount, 0);
+    expect(viewModel.hasActiveFilters, isTrue);
+    expect(viewModel.listings.map((listing) => listing.id), sourceIds);
+    expect(repository.callCount, 1);
+    expect(
+      () => viewModel.visibleListings.add(needSoon),
+      throwsUnsupportedError,
+    );
+
+    viewModel.clearFilters();
+    expect(viewModel.kindFilter, FeedKindFilter.all);
+    expect(viewModel.timeFilter, FeedTimeFilter.all);
+    expect(viewModel.visibleCount, 5);
+  });
+
+  test('reselecting filters is quiet and Ending soon includes its boundary',
+      () async {
+    final now = DateTime(2026, 7, 30, 12);
+    final boundary = _listing(
+      id: 'boundary',
+      kind: ListingKind.offer,
+      activeUntil: now.add(const Duration(hours: 3)),
+    );
+    final viewModel = FeedViewModel(
+      repository: _FakeListingRepository.responses([
+        [boundary],
+      ]),
+      clock: () => now,
+    );
+    addTearDown(viewModel.dispose);
+    await viewModel.loadListings();
+    var notifications = 0;
+    viewModel.addListener(() => notifications++);
+
+    viewModel.setKindFilter(FeedKindFilter.all);
+    viewModel.setTimeFilter(FeedTimeFilter.all);
+    expect(notifications, 0);
+    viewModel.setTimeFilter(FeedTimeFilter.endingSoon);
+    expect(notifications, 1);
+    expect(viewModel.visibleListings.single.id, 'boundary');
+  });
+
+  test('addCreatedListing validates origin, resets filters, and sorts',
+      () async {
+    final now = DateTime(2026, 7, 30, 12);
+    final repository = _FakeListingRepository.responses([
+      const <Listing>[],
+    ]);
+    final viewModel = FeedViewModel(
+      repository: repository,
+      clock: () => now,
+    );
+    addTearDown(viewModel.dispose);
+    await viewModel.loadListings();
+    viewModel.setKindFilter(FeedKindFilter.offers);
+    viewModel.setTimeFilter(FeedTimeFilter.today);
+    final created = _listing(
+      id: 'created',
+      origin: ListingOrigin.local,
+      activeUntil: now.add(const Duration(hours: 1)),
+    );
+
+    expect(viewModel.addCreatedListing(created), isTrue);
+    expect(viewModel.status, FeedStatus.ready);
+    expect(viewModel.listings.single, same(created));
+    expect(viewModel.kindFilter, FeedKindFilter.all);
+    expect(viewModel.timeFilter, FeedTimeFilter.all);
+    expect(viewModel.addCreatedListing(created), isFalse);
+    expect(
+      viewModel.addCreatedListing(_listing(id: 'sample')),
+      isFalse,
+    );
+    expect(viewModel.listings, hasLength(1));
+    expect(repository.mutationCalls, 0);
+  });
+
+  test('details updates recalculate an active Today filter', () async {
+    final now = DateTime(2026, 7, 30, 12);
+    final local = _listing(
+      id: 'local',
+      origin: ListingOrigin.local,
+      activeUntil: now.add(const Duration(hours: 2)),
+    );
+    final viewModel = FeedViewModel(
+      repository: _FakeListingRepository.responses([
+        [local],
+      ]),
+      clock: () => now,
+    );
+    addTearDown(viewModel.dispose);
+    await viewModel.loadListings();
+    viewModel.setTimeFilter(FeedTimeFilter.today);
+
+    expect(viewModel.visibleListings, hasLength(1));
+    viewModel.applyListingUpdate(local.copyWith(status: ListingStatus.closed));
+    expect(viewModel.visibleListings, isEmpty);
+    viewModel.applyListingUpdate(local.copyWith(status: ListingStatus.open));
+    expect(viewModel.visibleListings, hasLength(1));
+    viewModel.applyListingUpdate(local.copyWith(isSaved: true));
+    expect(viewModel.visibleListings, hasLength(1));
+    viewModel.applyListingUpdate(local.copyWith(isContacted: true));
+    expect(viewModel.visibleListings, hasLength(1));
+  });
 }
 
 class _FakeListingRepository implements ListingRepository {
@@ -199,6 +359,12 @@ class _FakeListingRepository implements ListingRepository {
       return response;
     }
     throw response;
+  }
+
+  @override
+  Future<Listing> createListing(ListingDraft draft) {
+    mutationCalls++;
+    throw UnimplementedError();
   }
 
   @override
@@ -234,12 +400,13 @@ Listing _listing({
   DateTime? activeUntil,
   ListingStatus status = ListingStatus.open,
   ListingOrigin origin = ListingOrigin.sample,
+  ListingKind kind = ListingKind.need,
 }) {
   final createdAt = DateTime(2026, 7, 28, 12);
   return Listing(
     id: id,
     neighborhoodId: 'vidyavihar',
-    kind: ListingKind.need,
+    kind: kind,
     title: 'Test listing',
     description: 'A useful test description.',
     category: ListingCategory.other,

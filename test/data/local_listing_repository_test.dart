@@ -5,6 +5,8 @@ import 'package:vihar_loop/data/listing_repository.dart';
 import 'package:vihar_loop/data/local/listing_local_store.dart';
 import 'package:vihar_loop/data/local_listing_repository.dart';
 import 'package:vihar_loop/domain/listing.dart';
+import 'package:vihar_loop/domain/listing_draft.dart';
+import 'package:vihar_loop/domain/listing_draft_validator.dart';
 import 'package:vihar_loop/domain/neighborhood.dart';
 
 import '../support/listing_fixture.dart';
@@ -324,6 +326,150 @@ void main() {
       expect(store.updates.last.isContacted, isTrue);
     });
   });
+
+  group('LocalListingRepository create', () {
+    ListingDraft validDraft({
+      String title = '  Music stand needed  ',
+      String description = '  A foldable stand would help rehearsal.  ',
+    }) {
+      return ListingDraft(
+        kind: ListingKind.need,
+        title: title,
+        description: description,
+        category: ListingCategory.musicHobbiesAndSports,
+        approximateArea: ApproximateArea.somaiyaSide,
+        contactPreference: ContactPreference.publicPlace,
+        activeUntil: fixedNow.add(const Duration(hours: 2)),
+      );
+    }
+
+    test('initializes then constructs every protected field and inserts',
+        () async {
+      final store = _MemoryListingStore();
+      var clockCalls = 0;
+      DateTime? idTime;
+      final repository = LocalListingRepository(
+        store: store,
+        clock: () {
+          clockCalls++;
+          return fixedNow;
+        },
+        idGenerator: (now) {
+          idTime = now;
+          return 'local-fixed-id';
+        },
+      );
+      await repository.fetchListings();
+      clockCalls = 0;
+
+      final created = await repository.createListing(validDraft());
+
+      expect(clockCalls, 1);
+      expect(idTime, fixedNow);
+      expect(store.insertCalls, 1);
+      expect(identical(store.inserts.single, created), isTrue);
+      expect(created.id, 'local-fixed-id');
+      expect(created.neighborhoodId, Neighborhood.vidyavihar.id);
+      expect(created.title, 'Music stand needed');
+      expect(created.description, 'A foldable stand would help rehearsal.');
+      expect(created.kind, ListingKind.need);
+      expect(created.category, ListingCategory.musicHobbiesAndSports);
+      expect(created.approximateArea, ApproximateArea.somaiyaSide);
+      expect(created.contactPreference, ContactPreference.publicPlace);
+      expect(created.createdAt, fixedNow);
+      expect(created.activeUntil, fixedNow.add(const Duration(hours: 2)));
+      expect(created.origin, ListingOrigin.local);
+      expect(created.status, ListingStatus.open);
+      expect(created.isSaved, isFalse);
+      expect(created.isContacted, isFalse);
+    });
+
+    test('invalid draft throws safely and performs no insert', () async {
+      final store = _MemoryListingStore();
+      final repository = LocalListingRepository(
+        store: store,
+        clock: () => fixedNow,
+        idGenerator: (_) => 'unused',
+      );
+
+      await expectLater(
+        repository.createListing(validDraft(title: 'bad')),
+        throwsA(isA<InvalidListingDraftException>()),
+      );
+
+      expect(store.insertCalls, 0);
+    });
+
+    test('duplicate insert propagates and returns no listing', () async {
+      final store = _MemoryListingStore(
+        initialListings: [buildTestListing(id: 'local-fixed-id')],
+      );
+      final repository = LocalListingRepository(
+        store: store,
+        clock: () => fixedNow,
+        idGenerator: (_) => 'local-fixed-id',
+      );
+
+      await expectLater(
+        repository.createListing(validDraft()),
+        throwsException,
+      );
+      expect(store.insertCalls, 1);
+      expect(
+          store.record('local-fixed-id')!.title, isNot('Music stand needed'));
+    });
+
+    test('failed create does not poison later Save or Create', () async {
+      final existing = buildTestListing(isSaved: false);
+      final store = _MemoryListingStore(
+        initialListings: [existing],
+        failingInserts: 1,
+      );
+      var id = 0;
+      final repository = LocalListingRepository(
+        store: store,
+        clock: () => fixedNow,
+        idGenerator: (_) => 'local-${id++}',
+      );
+
+      await expectLater(
+          repository.createListing(validDraft()), throwsException);
+      final saved = await repository.setSaved(
+        listingId: existing.id,
+        isSaved: true,
+      );
+      final created = await repository.createListing(validDraft());
+
+      expect(saved.isSaved, isTrue);
+      expect(created.id, 'local-1');
+      expect(store.insertCalls, 2);
+    });
+
+    test('concurrent creates are serialized', () async {
+      final started = Completer<void>();
+      final gate = Completer<void>();
+      final store = _MemoryListingStore(
+        firstInsertStarted: started,
+        firstInsertGate: gate,
+      );
+      var id = 0;
+      final repository = LocalListingRepository(
+        store: store,
+        clock: () => fixedNow,
+        idGenerator: (_) => 'local-${id++}',
+      );
+
+      final first = repository.createListing(validDraft());
+      final second = repository.createListing(validDraft());
+      await started.future;
+      expect(store.insertCalls, 1);
+      gate.complete();
+
+      final created = await Future.wait([first, second]);
+      expect(created.map((listing) => listing.id), ['local-0', 'local-1']);
+      expect(store.insertCalls, 2);
+    });
+  });
 }
 
 class _MemoryListingStore implements ListingLocalStore {
@@ -334,9 +480,13 @@ class _MemoryListingStore implements ListingLocalStore {
     this.reverseAfterSeed = false,
     this.firstUpdateStarted,
     this.firstUpdateGate,
+    this.firstInsertStarted,
+    this.firstInsertGate,
     int failingUpdates = 0,
+    int failingInserts = 0,
   })  : _seeded = initialListings != null,
         _failingUpdates = failingUpdates,
+        _failingInserts = failingInserts,
         _records = {
           for (final listing in initialListings ?? const <Listing>[])
             listing.id: listing,
@@ -347,15 +497,20 @@ class _MemoryListingStore implements ListingLocalStore {
   final bool reverseAfterSeed;
   final Completer<void>? firstUpdateStarted;
   final Completer<void>? firstUpdateGate;
+  final Completer<void>? firstInsertStarted;
+  final Completer<void>? firstInsertGate;
   final Map<String, Listing> _records;
 
   bool _seeded;
   int _failingUpdates;
+  int _failingInserts;
   int seedCalls = 0;
   int readByIdCalls = 0;
   int updateCalls = 0;
+  int insertCalls = 0;
   bool failReads = false;
   final List<Listing> updates = [];
+  final List<Listing> inserts = [];
 
   Listing? record(String id) => _records[id];
 
@@ -391,6 +546,26 @@ class _MemoryListingStore implements ListingLocalStore {
   Future<Listing?> readById(String id) async {
     readByIdCalls++;
     return _records[id];
+  }
+
+  @override
+  Future<void> insert(Listing listing) async {
+    insertCalls++;
+    if (_failingInserts > 0) {
+      _failingInserts--;
+      throw Exception('insert failed');
+    }
+    if (insertCalls == 1) {
+      firstInsertStarted?.complete();
+      if (firstInsertGate case final gate?) {
+        await gate.future;
+      }
+    }
+    if (_records.containsKey(listing.id)) {
+      throw Exception('duplicate record');
+    }
+    _records[listing.id] = listing;
+    inserts.add(listing);
   }
 
   @override

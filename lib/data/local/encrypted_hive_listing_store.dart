@@ -146,6 +146,28 @@ class EncryptedHiveListingStore implements ListingLocalStore {
   }
 
   @override
+  Future<void> insert(Listing listing) async {
+    final box = await _openBox();
+    final key = '$listingKeyPrefix${listing.id}';
+
+    try {
+      if (box.containsKey(key)) {
+        throw const LocalStorageException(
+          'A local listing with this identifier already exists.',
+        );
+      }
+      await box.put(key, _codec.encode(listing));
+    } on LocalStorageException {
+      rethrow;
+    } on Object catch (error) {
+      throw LocalStorageException(
+        'The local listing could not be created.',
+        cause: error,
+      );
+    }
+  }
+
+  @override
   Future<void> update(Listing listing) async {
     final box = await _openBox();
     final key = '$listingKeyPrefix${listing.id}';

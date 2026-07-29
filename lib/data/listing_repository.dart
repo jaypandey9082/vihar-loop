@@ -1,7 +1,10 @@
 import 'package:vihar_loop/domain/listing.dart';
+import 'package:vihar_loop/domain/listing_draft.dart';
 
 abstract interface class ListingRepository {
   Future<List<Listing>> fetchListings();
+
+  Future<Listing> createListing(ListingDraft draft);
 
   Future<Listing> setSaved({
     required String listingId,

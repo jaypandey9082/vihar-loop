@@ -12,25 +12,25 @@ Statuses mean:
 | Requirement | Planned section | Evidence file or future code area | Status | Verification note |
 | --- | --- | --- | --- | --- |
 | One neighbourhood feed | Section 1 | `lib/features/feed/feed_screen.dart` | Done | Feed widget test passes |
-| Create listing | Section 4 | Create feature | Planned | Not present in Section 3 |
-| Title | Section 1 model; later create | `lib/domain/listing.dart` | Done | Immutable field and sample content present |
-| Category | Section 1 model; later create | `lib/domain/listing.dart` | Done | Approved enum and user-facing labels present |
-| Description | Section 1 model; later create | `lib/domain/listing.dart` | Done | Full description shown on details |
-| Approximate area | Section 1 | `lib/domain/listing.dart`, feed/details | Done | Four broad Vidyavihar choices; no exact address |
-| Contact preference | Section 1 | `lib/domain/listing.dart`, details | Done | Natural user-facing wording present |
+| Create listing | Section 4 | `lib/features/create_listing/`, repository, encrypted store | Done | UI, repository create, encrypted insert, widget tests, encrypted-reopen proof, and API 36 production flow pass |
+| Title | Section 4 create input | Create form and `ListingDraftValidator` | Done | Visible 5–80 character one-line validation and boundary tests pass |
+| Category | Section 4 create input | Create form and `ListingDraft` | Done | Approved choices persist through the repository |
+| Description | Section 4 create input | Create form and `ListingDraftValidator` | Done | Visible 15–500 character validation and boundary tests pass |
+| Approximate area | Section 4 create input | Create form and domain choices | Done | Four broad choices only; no exact-address field |
+| Contact preference | Section 4 create input | Create form and domain choices | Done | Approved preferences persist; no phone/email field |
 | Details | Section 1 | `lib/features/listing_details/listing_details_screen.dart` | Done | Navigation and details widget test passes |
 | Saved | Section 3 | Repository, details view model/UI, encrypted store | Done | Unit, widget, encrypted-reopen, and API 36 force-stop checks pass |
 | Contacted | Section 3 | Repository, details view model/UI, encrypted store | Done | Unit, widget, encrypted-reopen, and API 36 force-stop checks pass |
-| Closed | Section 3 mutation; Section 4 production origin | Repository, details UI, encrypted persistence tests | Implemented, verification pending | Local-origin widget and encrypted-reopen tests pass; no real production local listing exists yet |
-| Personal feature: Today Loop | Later | Feed filters using `activeUntil` | Planned | Time field and wording modeled only |
+| Closed | Section 3 mutation; Section 4 production origin | Repository, details UI, encrypted persistence | Done | A production-created local record was closed, relaunched, reopened, and relaunched on API 36 |
+| Personal feature: Today Loop | Section 4 | Domain timing helper, feed view model/UI | Done | Filter rules, combinations, badges, widget tests, and API 36 Ending Soon flow pass |
 | Accessible controls | Section 1 baseline; final verification later | Feed/details widgets | Implemented, verification pending | Standard Material controls used; manual device pass pending |
 | Screen-reader cards | Section 1 | `lib/features/feed/listing_card.dart` | Implemented, verification pending | Semantics test passes; manual TalkBack run pending |
-| Visible form errors | Section 4 | Create form | Planned | No form in Section 3 |
+| Visible form errors | Section 4 | Create form | Done | Required errors are visible and widget tested; incomplete API 36 form check passes |
 | Tap targets | Section 1 baseline; final verification later | Listing card and Retry button | Implemented, verification pending | Padded card and 48dp button minimum; manual check pending |
 | Text scaling | Section 1 baseline; final verification later | `test/features/feed/feed_screen_test.dart` | Done | Approximately 200% layout test passes |
 | No committed secret | Section 1 onward | `.gitignore`, repository scan | Done | No secret or environment file added |
 | No exact address | Section 1 onward | Domain choices and sample data | Done | Only approved broad areas used |
-| Input validation | Section 4 | Create form and repository | Planned | No user input in Section 3 |
+| Input validation | Section 4 | Create form, validator, and repository | Done | Structural and obvious phone/email/URL rejection pass; broader exact-address hardening remains Section 6 |
 | Local data reset | Later | Persistent repository/settings | Planned | Persistence exists; no reset method or UI is implemented |
 | Encrypted local persistence | Section 2 | `lib/data/local/encrypted_hive_listing_store.dart` | Done | Real temporary-Hive encryption and reopen tests pass |
 | Versioned record codec | Section 2 | `lib/data/local/listing_record_codec.dart` | Done | Full-field mapping and invalid-record tests pass |
@@ -51,22 +51,21 @@ Statuses mean:
 | Accessibility document | Section 1 | `docs/accessibility-check.md` | Done | Automated and manual states distinguished |
 | Security document | Section 1–2 | `docs/security-baseline.md` | Done | Implemented key, encryption, backup, and failure decisions addressed |
 | Local-AI document | Section 1 | `docs/local-ai-note.md` | Done | Clearly marked not implemented |
-| README | Section 1–3 | `README.md` | Done | Section 3 interactions, storage, ownership limit, and gaps included |
-| Three-minute demo | Draft in Section 1; final later | `docs/demo-script.md` | Planned | Section 2 persistence demo exists; full flow remains unimplemented |
+| README | Section 1–4 | `README.md` | Done | Section 4 creation, Today Loop, persistence, and honest gaps included |
+| Three-minute demo | Draft in Section 1; final later | `docs/demo-script.md` | Implemented, verification pending | Non-AI Section 4 flow works; final demo still lacks Draft Assist |
 | Fresh checkout | Section 2 gate | README commands and a clean copy | Done | Committed-history clone passes setup, analysis, 44 tests, and Android debug build |
 | Clean repository | Section 2 gate | `.gitignore`, `git status`, `git diff --check` | Done | Staged-file, generated-data, local-path, and secret-pattern audits pass |
 
 ## Current verification snapshot
 
-Flutter 3.44.8 and Dart 3.12.2 are installed. Section 3 formatting, analysis,
-unit/widget tests, and Android debug build pass. API 36 save/contact,
-force-stop/relaunch, removal, and second force-stop/relaunch checks pass.
-Encrypted temporary-Hive tests prove Saved, Contacted, and local-origin Closed
-survive reopen without duplicates or immutable-field changes. Android XML and
-iOS source plists validate. Full Xcode, a real created local listing, and
-manual TalkBack verification remain separate later checks.
+Flutter 3.44.8 and Dart 3.12.2 are installed. Section 4 formatting, analysis,
+116 unit/widget tests, and Android debug build pass. Automated coverage proves
+draft validation, time boundaries, duplicate-safe encrypted insertion, and
+encrypted create/close/reopen persistence. API 36 verifies incomplete errors,
+creation, Ending Soon discovery, close, reopen, and 3-out-of-3 relaunch
+persistence.
 
-Create listing, form validation, Today Loop, user-facing reset, local AI,
-deterministic fallback, and Gemma remain Planned. The complete Close user
-workflow is not Done until Section 4 creates and manually verifies a real
-local-origin listing.
+Android XML and iOS source plists validate. Full Xcode and manual TalkBack
+remain pending. User-facing reset, local AI, `LocalAiService`, deterministic
+fallback, and Gemma remain Planned; the complete MAL homework is not claimed
+finished.

@@ -9,6 +9,7 @@ import 'package:vihar_loop/data/local/local_storage_exception.dart';
 import 'package:vihar_loop/data/local_listing_repository.dart';
 import 'package:vihar_loop/data/seed_listings.dart';
 import 'package:vihar_loop/domain/listing.dart';
+import 'package:vihar_loop/domain/listing_draft.dart';
 import 'package:vihar_loop/security/encryption_key_store.dart';
 
 import '../../support/listing_fixture.dart';
@@ -32,7 +33,12 @@ void main() {
     await store?.close();
     await Hive.close();
     if (directory.existsSync()) {
-      await directory.delete(recursive: true);
+      try {
+        await directory.delete(recursive: true);
+      } on PathNotFoundException {
+        // Hive can finish deleting its temporary files between the existence
+        // check and this teardown cleanup.
+      }
     }
   });
 
@@ -224,6 +230,72 @@ void main() {
       expect(box.get('listing:test-listing'), '{corrupt');
     });
 
+    test('insert adds one complete local record without changing seeds',
+        () async {
+      final seeds = buildSeedListings(DateTime(2026, 7, 29, 12));
+      final local = buildTestListing(
+        id: 'local-created',
+        origin: ListingOrigin.local,
+        status: ListingStatus.open,
+        isSaved: false,
+        isContacted: false,
+      );
+      store = createStore();
+      await store!.seedIfRequired(seeds);
+      final originalSeed = await store!.readById(seeds.first.id);
+
+      await store!.insert(local);
+
+      final restored = await store!.readById(local.id);
+      expectSameListing(restored!, local);
+      expect(await store!.readAll(), hasLength(10));
+      expectSameListing(
+          (await store!.readById(seeds.first.id))!, originalSeed!);
+      expect(
+        Hive.box<String>(boxName).get(
+          EncryptedHiveListingStore.seedVersionKey,
+        ),
+        '1',
+      );
+
+      await expectLater(
+        store!.insert(local.copyWith(isSaved: true)),
+        throwsA(isA<LocalStorageException>()),
+      );
+      expectSameListing((await store!.readById(local.id))!, local);
+    });
+
+    test('insert does not create metadata and remains encrypted after reopen',
+        () async {
+      final local = buildTestListing(
+        id: 'local-without-seed',
+        origin: ListingOrigin.local,
+      );
+      store = createStore();
+
+      await store!.insert(local);
+      final box = Hive.box<String>(boxName);
+      expect(
+        box.containsKey(EncryptedHiveListingStore.seedVersionKey),
+        isFalse,
+      );
+      await box.flush();
+
+      final bytes = <int>[];
+      await for (final entity in directory.list(recursive: true)) {
+        if (entity is File) {
+          bytes.addAll(await entity.readAsBytes());
+        }
+      }
+      final rawText = utf8.decode(bytes, allowMalformed: true);
+      expect(rawText, isNot(contains(local.title)));
+      expect(rawText, isNot(contains(local.description)));
+
+      await store!.close();
+      store = createStore();
+      expectSameListing((await store!.readById(local.id))!, local);
+    });
+
     test('wrong encryption key cannot read an existing box', () async {
       store = createStore();
       await store!.seedIfRequired([buildTestListing()]);
@@ -332,6 +404,82 @@ void main() {
             .status,
         ListingStatus.open,
       );
+    });
+
+    test('created listing closes and reopens across encrypted restarts',
+        () async {
+      final now = DateTime(2026, 7, 30, 12);
+      final deadline = now.add(const Duration(hours: 2));
+      final draft = ListingDraft(
+        kind: ListingKind.need,
+        title: '  Foldable music stand for rehearsal  ',
+        description: '  A foldable stand would help our rehearsal tonight.  ',
+        category: ListingCategory.musicHobbiesAndSports,
+        approximateArea: ApproximateArea.somaiyaSide,
+        contactPreference: ContactPreference.publicPlace,
+        activeUntil: deadline,
+      );
+      store = createStore();
+      final firstRepository = LocalListingRepository(
+        store: store!,
+        clock: () => now,
+        idGenerator: (_) => 'local-end-to-end',
+      );
+
+      final created = await firstRepository.createListing(draft);
+      expect(created.origin, ListingOrigin.local);
+      expect(created.status, ListingStatus.open);
+      await firstRepository.setStatus(
+        listingId: created.id,
+        status: ListingStatus.closed,
+      );
+      await store!.close();
+
+      store = createStore();
+      final secondRepository = LocalListingRepository(
+        store: store!,
+        clock: () => now.add(const Duration(days: 1)),
+      );
+      final firstReopen = await secondRepository.fetchListings();
+      final closed =
+          firstReopen.singleWhere((listing) => listing.id == created.id);
+      expect(firstReopen, hasLength(10));
+      expect(
+        firstReopen.where((listing) => listing.origin == ListingOrigin.sample),
+        hasLength(9),
+      );
+      expect(closed.title, 'Foldable music stand for rehearsal');
+      expect(
+        closed.description,
+        'A foldable stand would help our rehearsal tonight.',
+      );
+      expect(closed.createdAt, now);
+      expect(closed.activeUntil, deadline);
+      expect(closed.origin, ListingOrigin.local);
+      expect(closed.status, ListingStatus.closed);
+
+      await secondRepository.setStatus(
+        listingId: created.id,
+        status: ListingStatus.open,
+      );
+      await store!.close();
+
+      store = createStore();
+      final thirdRepository = LocalListingRepository(
+        store: store!,
+        clock: () => now.add(const Duration(days: 2)),
+      );
+      final finalListings = await thirdRepository.fetchListings();
+      final reopened =
+          finalListings.singleWhere((listing) => listing.id == created.id);
+      expect(reopened.status, ListingStatus.open);
+      expect(finalListings.map((listing) => listing.id).toSet(), hasLength(10));
+      final box = Hive.box<String>(boxName);
+      expect(box.get(EncryptedHiveListingStore.seedVersionKey), '1');
+      final record = jsonDecode(
+        box.get('listing:${created.id}')!,
+      ) as Map<String, dynamic>;
+      expect(record['schemaVersion'], ListingRecordCodec.schemaVersion);
     });
 
     test('corrupt JSON and unknown schema fail the whole read', () async {

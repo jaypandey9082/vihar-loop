@@ -29,12 +29,18 @@ FeedScreen → FeedViewModel → ListingRepository
                        FlutterSecureStorage
 ```
 
-`ListingRepository` exposes the feed read plus explicit Saved, Contacted, and
-Status operations. `LocalListingRepository` coordinates retryable first-run
-initialization, serializes mutations, rereads the latest value, and owns the
-product rule that sample listings cannot change status. The store lazily opens
-one encrypted `Box<String>` named `vihar_loop_listings_v1` and owns exact-key
-reads plus complete-record replacement without upsert.
+`ListingRepository` exposes the feed read, create, and explicit Saved,
+Contacted, and Status operations. A widget-independent `ListingDraft` carries
+only user-controlled create values. The repository normalizes and revalidates
+that boundary, then constructs protected fields including a stable
+`local-<UTC microseconds>-<secure random hex>` ID, local origin, open status,
+creation time, and initial private markers.
+
+`LocalListingRepository` coordinates retryable first-run initialization,
+serializes all mutations, rereads the latest value for updates, and owns the
+rule that sample listings cannot change status. The store lazily opens one
+encrypted `Box<String>` named `vihar_loop_listings_v1`; its exact-key insert
+rejects duplicates and cannot silently upsert.
 
 Listing values are explicit schema-version-1 JSON records. Stable text codes,
 UTC ISO-8601 timestamps, complete validation, and matching `listing:<id>` keys
@@ -69,6 +75,12 @@ only after storage succeeds, and sends that result back to the feed. Local
 origin is sufficient for this offline slice; future server identity and
 ownership checks must be server-authoritative.
 
+Feed time logic lives in a domain timing helper and `FeedViewModel`, using the
+same injected clock as creation. Today and Ending Soon are presentation
+queries over stored values and do not rewrite them. Filtered navigation passes
+the selected immutable `Listing` value rather than a display-list index, so a
+filtered order cannot open the wrong record.
+
 ## Alternatives considered
 
 - **In-memory fallback after failure:** rejected because it would hide
@@ -85,6 +97,8 @@ ownership checks must be server-authoritative.
   is validated.
 - **Hosted AI or broad architecture layers:** outside this slice and contrary
   to the narrow offline boundary.
+- **Widget-built persisted listings:** rejected because protected fields,
+  validation, IDs, and mutation ordering belong at the repository boundary.
 
 ## Consequences accepted
 
@@ -107,3 +121,7 @@ user-controlled reset must deliberately remove both data
 and key with clear consequences. Schema or seed changes need explicit
 migrations at the codec/store boundary. A backend would reverse local-only
 trust, backup, and telemetry assumptions and requires a new ADR.
+
+Future Draft Assist may create an editable `ListingDraft`, but it must pass the
+same validator and repository path and can never persist directly. A future
+backend must also replace the current local-origin ownership assumption.

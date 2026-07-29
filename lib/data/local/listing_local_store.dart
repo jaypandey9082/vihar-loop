@@ -7,5 +7,7 @@ abstract interface class ListingLocalStore {
 
   Future<Listing?> readById(String id);
 
+  Future<void> insert(Listing listing);
+
   Future<void> update(Listing listing);
 }

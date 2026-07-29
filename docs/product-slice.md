@@ -19,34 +19,44 @@ Help someone notice a relevant, time-sensitive local need or offer and decide
 whether to respond, without requiring a hosted service or revealing a precise
 location.
 
-The intended complete workflow is:
+The currently implemented core workflow is:
 
 ```text
-Feed → details → create → save/contact/close → local persistence
-     → optional local AI assistance → continued offline use
-```
-
-Section 3 implements this currently available workflow:
-
-```text
-Feed → details → save/contact markers → encrypted persistence
+Feed → create → encrypted persistence → details
+     → save/contact/close/reopen → relaunch
 ```
 
 Saved and Contacted are private markers stored only on this device. Contacted
 does not perform communication. Details and feed receive the successfully
 persisted result without requiring a restart.
 
-Status mutation is owner-controlled. Sample records cannot be closed. Records
-created locally will be closeable and reopenable after Section 4 adds Create;
-all current production seeds deliberately remain sample records. Create and
-local AI remain later work.
+Status mutation is owner-controlled. Records created on this installation have
+local origin and can be closed or reopened. Sample records cannot be closed.
+Local origin is only an offline product distinction, not proof of a person's
+identity; a future backend must replace that ownership assumption.
 
 ## Today Loop
 
 Every need has a **Needed by** time and every offer has an **Available until**
-time. A later section will use this field for Today and Ending Soon discovery.
-The domain model and persisted sample records include the time now, but
-Section 3 does not expose filters.
+time. Today Loop is implemented in the feed:
+
+- **Today:** open, not past, and ending on the same local calendar date as now.
+- **Ending soon:** open, strictly after now, and ending within three hours.
+- **Need/Offer:** an independent type filter that combines with either time
+  filter.
+
+Closed and past listings remain visible under All but are excluded from Today
+and Ending Soon. Cards show at most one time badge, prioritizing Ending soon
+over Today.
+
+## Creation and privacy boundary
+
+The create form accepts only Need/Offer, title, description, approved category,
+broad approximate area, approved contact preference, and deadline. It has no
+exact-address, phone, or email field. Obvious phone, email, and URL text is
+rejected, and the repository revalidates before persistence. This is a
+baseline boundary rather than comprehensive address detection; broader
+privacy hardening remains later work.
 
 ## Why the product is intentionally small
 
@@ -61,8 +71,8 @@ before marketplace breadth is added.
   in a public place.
 - A broad neighbourhood area is enough to judge local relevance.
 - Needs and offers are short-lived more often than permanent.
-- Sample content is sufficient to validate navigation, markers, and encrypted
-  mutation persistence before Create begins.
+- Local creation is sufficient to exercise the real owner-only close/reopen
+  path without adding accounts or a backend.
 - A listing is not a promise of availability, identity, quality, or safety.
 
 ## Explicitly out of scope

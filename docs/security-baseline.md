@@ -1,6 +1,6 @@
 # Security baseline
 
-Section 3 remains local-only: there is no backend, HTTP client, authentication,
+Section 4 remains local-only: there is no backend, HTTP client, authentication,
 analytics, telemetry, or hosted-service secret. Listing data uses broad
 Vidyavihar areas and does not contain an exact address.
 
@@ -22,8 +22,11 @@ synchronized through iCloud.
 
 There is still no server. All records are local fictional product data.
 Saved and Contacted are encrypted device-local markers, and marking Contacted
-sends no communication off the device. No permission, telemetry, or personal
-data field was added.
+sends no communication off the device. Create has no exact-address, phone, or
+email field; it offers only approved broad-area and contact-preference choices.
+Obvious phone, email, and URL content is rejected in free text. The repository
+revalidates a normalized draft before storing it, so widget validation is not
+the persistence trust boundary.
 
 UI visibility is not an authorization boundary: the repository rejects status
 mutation for sample-origin records and permits it only for local-origin
@@ -76,6 +79,12 @@ iOS Debug/Profile and Release entitlements declare Keychain access. Source
 configuration is validated, but runtime Keychain behavior remains unverified
 because full Xcode is unavailable.
 
-Section 3 retains schema and seed version 1 and has no migration framework. A future
+Section 4 retains schema and seed version 1 and has no migration framework. A future
 schema change needs an explicit, tested migration or repair path; corruption
 must not be hidden by reseeding.
+
+Section 4 adds no network permission, platform permission, telemetry, or
+plaintext fallback. User-created content is stored in the same encrypted box
+as seed records. Local origin is a device-local product marker, not server
+identity. Broader exact-address detection and a user-controlled delete-all-data
+flow remain explicitly owned by Section 6.

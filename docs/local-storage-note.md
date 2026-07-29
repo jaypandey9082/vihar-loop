@@ -43,12 +43,19 @@ absent from raw box bytes, and a wrong key cannot normally open the box. This
 is not a formal cryptographic audit and does not protect an unlocked, rooted,
 compromised, or instrumented device.
 
-`ListingLocalStore` now provides exact-key `readById` and `update` operations.
-Update requires an existing `listing:<id>` key, validates the current record,
-and overwrites one complete versioned encrypted record; it never upserts or
-touches seed metadata. `LocalListingRepository` serializes product mutations
-in call order, rereads the latest record inside that queue, and skips
-same-value writes. A failed mutation does not poison later work.
+`ListingLocalStore` provides exact-key `readById`, `insert`, and `update`
+operations. Insert rejects an existing `listing:<id>` key and never upserts;
+it writes one complete schema-version-1 encrypted record and does not create
+or change `meta:seed_version`. Update requires an existing key, validates the
+current record, and replaces one complete versioned encrypted record without
+touching seed metadata.
 
-Record schema version 1 and seed version 1 remain unchanged. Create, delete,
-user-facing reset, and migration operations remain absent.
+Created records therefore share record schema version 1 with seeds. The
+repository constructs the local ID, local origin, open status, Vidyavihar
+neighbourhood, creation time, and false Saved/Contacted markers, then calls
+insert. Those records can use the existing update operation for Saved,
+Contacted, Close, and Reopen. `LocalListingRepository` serializes create and
+other mutations in call order; a failed mutation does not poison later work.
+
+Record schema version 1, seed version 1, and existing seed content remain
+unchanged. Delete, user-facing reset, and migration operations remain absent.
