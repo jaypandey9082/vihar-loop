@@ -81,6 +81,13 @@ queries over stored values and do not rewrite them. Filtered navigation passes
 the selected immutable `Listing` value rather than a display-list index, so a
 filtered order cannot open the wrong record.
 
+Accessibility remains a UI-layer concern. Standard Material controls retain
+their framework semantics, while custom composite controls own one deliberate
+semantic boundary and executable action. A small heading widget sets both the
+Flutter 3.44 `header` property and `headingLevel` for later engine behaviour.
+Focus, traversal, and live-region changes do not cross the repository or
+storage boundaries.
+
 ## Alternatives considered
 
 - **In-memory fallback after failure:** rejected because it would hide

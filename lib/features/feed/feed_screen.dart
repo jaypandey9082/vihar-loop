@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:vihar_loop/core/accessibility/accessible_heading.dart';
 import 'package:vihar_loop/core/clock.dart';
 import 'package:vihar_loop/data/listing_repository.dart';
 import 'package:vihar_loop/domain/listing.dart';
@@ -190,10 +191,13 @@ class _FeedHeader extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 24),
-          Text(
-            'Nearby needs and offers',
-            style: textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.w700,
+          AccessibleHeading(
+            level: 1,
+            child: Text(
+              'Nearby needs and offers',
+              style: textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
           const SizedBox(height: 8),
@@ -227,15 +231,21 @@ class _FeedFilters extends StatelessWidget {
     final visible = viewModel.visibleCount;
     final total = viewModel.totalCount;
     final countText = viewModel.hasActiveFilters
-        ? '$visible of $total ${total == 1 ? 'listing' : 'listings'}'
-        : '$total ${total == 1 ? 'listing' : 'listings'}';
+        ? 'Showing $visible of $total ${total == 1 ? 'listing' : 'listings'}'
+        : 'Showing $total ${total == 1 ? 'listing' : 'listings'}';
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Type', style: Theme.of(context).textTheme.titleSmall),
+          AccessibleHeading(
+            level: 2,
+            child: Text(
+              'Type',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+          ),
           const SizedBox(height: 6),
           Wrap(
             spacing: 8,
@@ -254,7 +264,13 @@ class _FeedFilters extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          Text('Time', style: Theme.of(context).textTheme.titleSmall),
+          AccessibleHeading(
+            level: 2,
+            child: Text(
+              'Time',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+          ),
           const SizedBox(height: 6),
           Wrap(
             spacing: 8,
@@ -307,12 +323,17 @@ class _FilteredEmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.filter_alt_off_outlined, size: 48),
+            const ExcludeSemantics(
+              child: Icon(Icons.filter_alt_off_outlined, size: 48),
+            ),
             const SizedBox(height: 16),
-            Text(
-              'No listings match these filters',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleLarge,
+            AccessibleHeading(
+              level: 1,
+              child: Text(
+                'No listings match these filters',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
             ),
             const SizedBox(height: 8),
             const Text(
@@ -365,31 +386,33 @@ class _EmptyFeed extends StatelessWidget {
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
-        child: Semantics(
-          container: true,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.inbox_outlined, size: 48),
-              const SizedBox(height: 16),
-              const Text(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ExcludeSemantics(
+              child: Icon(Icons.inbox_outlined, size: 48),
+            ),
+            const SizedBox(height: 16),
+            const AccessibleHeading(
+              level: 1,
+              child: Text(
                 'No listings yet',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
               ),
-              const SizedBox(height: 8),
-              const Text(
-                'Be the first to post a need or offer in Vidyavihar.',
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 20),
-              FilledButton.icon(
-                onPressed: onCreate,
-                icon: const Icon(Icons.add),
-                label: const Text('Post a need or offer'),
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Be the first to post a need or offer in Vidyavihar.',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: onCreate,
+              icon: const Icon(Icons.add),
+              label: const Text('Post a need or offer'),
+            ),
+          ],
         ),
       ),
     );
@@ -410,29 +433,33 @@ class _ErrorFeed extends StatelessWidget {
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
-        child: Semantics(
-          container: true,
-          liveRegion: true,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.sync_problem_outlined, size: 48),
-              const SizedBox(height: 16),
-              Text(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ExcludeSemantics(
+              child: Icon(Icons.sync_problem_outlined, size: 48),
+            ),
+            const SizedBox(height: 16),
+            AccessibleHeading(
+              level: 1,
+              child: Text(
                 'Unable to load listings',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.titleLarge,
               ),
-              const SizedBox(height: 8),
-              Text(message, textAlign: TextAlign.center),
-              const SizedBox(height: 20),
-              FilledButton.icon(
-                onPressed: onRetry,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Retry loading listings'),
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 8),
+            Semantics(
+              liveRegion: true,
+              child: Text(message, textAlign: TextAlign.center),
+            ),
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry loading listings'),
+            ),
+          ],
         ),
       ),
     );

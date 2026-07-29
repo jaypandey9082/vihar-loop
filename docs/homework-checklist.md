@@ -23,11 +23,15 @@ Statuses mean:
 | Contacted | Section 3 | Repository, details view model/UI, encrypted store | Done | Unit, widget, encrypted-reopen, and API 36 force-stop checks pass |
 | Closed | Section 3 mutation; Section 4 production origin | Repository, details UI, encrypted persistence | Done | A production-created local record was closed, relaunched, reopened, and relaunched on API 36 |
 | Personal feature: Today Loop | Section 4 | Domain timing helper, feed view model/UI | Done | Filter rules, combinations, badges, widget tests, and API 36 Ending Soon flow pass |
-| Accessible controls | Section 1 baseline; final verification later | Feed/details widgets | Implemented, verification pending | Standard Material controls used; manual device pass pending |
-| Screen-reader cards | Section 1 | `lib/features/feed/listing_card.dart` | Implemented, verification pending | Semantics test passes; manual TalkBack run pending |
-| Visible form errors | Section 4 | Create form | Done | Required errors are visible and widget tested; incomplete API 36 form check passes |
-| Tap targets | Section 1 baseline; final verification later | Listing card and Retry button | Implemented, verification pending | Padded card and 48dp button minimum; manual check pending |
-| Text scaling | Section 1 baseline; final verification later | `test/features/feed/feed_screen_test.dart` | Done | Approximately 200% layout test passes |
+| Accessible controls | Section 5 | Feed/create/details widgets | Done | Official label/tap-target guidelines, semantic actions, traversal, keyboard, and representative API 36 TalkBack checks pass |
+| Screen-reader cards | Section 5 | `lib/features/feed/listing_card.dart` | Done | Exposed node owns the tap action; semantic activation and TalkBack-enabled API 36 navigation open the correct listing |
+| Visible form errors | Section 4–5 | Create form | Done | Visible errors, invalid deadline semantics, and six first-invalid focus cases pass |
+| Tap targets | Section 5 | Critical feed/create/details states | Done | Official Flutter Android tap-target guideline passes; iOS guideline passes as automated source-level evidence |
+| Text scaling | Section 5 | `test/accessibility/accessibility_guidelines_test.dart` | Done | 200% portrait/landscape tests and API 36 font-scale 1.3/density 560 pass |
+| Focus order | Section 5 | `test/accessibility/accessibility_traversal_test.dart` | Done | Simulated traversal and keyboard forward/backward activation checks pass; representative TalkBack focus observed |
+| Contrast | Section 5 | `test/accessibility/accessibility_guidelines_test.dart` | Done | Official Flutter contrast guideline passes tested light and dark states; Scanner unavailable |
+| Manual TalkBack | Section 5 | `docs/accessibility-check.md` | Implemented, verification pending | Representative API 36 flow and Save speech observed; complete create/picker/progress/dialog script remains blocked by reliable remote gesture control |
+| VoiceOver | Later | iOS runtime | Blocked | Full Xcode is unavailable |
 | No committed secret | Section 1 onward | `.gitignore`, repository scan | Done | No secret or environment file added |
 | No exact address | Section 1 onward | Domain choices and sample data | Done | Only approved broad areas used |
 | Input validation | Section 4 | Create form, validator, and repository | Done | Structural and obvious phone/email/URL rejection pass; broader exact-address hardening remains Section 6 |
@@ -58,14 +62,14 @@ Statuses mean:
 
 ## Current verification snapshot
 
-Flutter 3.44.8 and Dart 3.12.2 are installed. Section 4 formatting, analysis,
-116 unit/widget tests, and Android debug build pass. Automated coverage proves
-draft validation, time boundaries, duplicate-safe encrypted insertion, and
-encrypted create/close/reopen persistence. API 36 verifies incomplete errors,
-creation, Ending Soon discovery, close, reopen, and 3-out-of-3 relaunch
-persistence.
+Flutter 3.44.8 and Dart 3.12.2 are installed. Section 5 formatting, analysis,
+148 unit/widget tests, the 31-test accessibility subset, and Android debug build
+pass. Official guidelines report no failures in the tested target, label, and
+contrast states. API 36 provides representative TalkBack and large-system-
+setting evidence in addition to the earlier create/close/relaunch proof.
 
-Android XML and iOS source plists validate. Full Xcode and manual TalkBack
-remain pending. User-facing reset, local AI, `LocalAiService`, deterministic
+Android XML and iOS source plists validate. Full Xcode, VoiceOver, Accessibility
+Scanner, and completion of the full TalkBack script remain pending.
+User-facing reset, local AI, `LocalAiService`, deterministic
 fallback, and Gemma remain Planned; the complete MAL homework is not claimed
 finished.

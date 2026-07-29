@@ -150,8 +150,7 @@ void main() {
       expect(
         find.bySemanticsLabel(
           RegExp(
-            r'Open\. Ending soon\. Saved\. Contacted\. Your post\. '
-            r'Open details',
+            r'Open\. Ending soon\. Saved\. Contacted\. Your post$',
           ),
         ),
         findsOneWidget,
@@ -216,7 +215,7 @@ void main() {
         find.bySemanticsLabel(
           RegExp(
             r'Need\. USB-C laptop charger for two hours\. Electronics\. '
-            r'Somaiya side\. Needed by .+\. Open\. Ending soon\. Open details',
+            r'Somaiya side\. Needed by .+\. Open\. Ending soon',
           ),
         ),
         findsOneWidget,

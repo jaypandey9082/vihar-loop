@@ -1,4 +1,7 @@
+import 'dart:ui' show SemanticsValidationResult;
+
 import 'package:flutter/material.dart';
+import 'package:vihar_loop/core/accessibility/accessible_heading.dart';
 import 'package:vihar_loop/core/clock.dart';
 import 'package:vihar_loop/data/listing_repository.dart';
 import 'package:vihar_loop/domain/listing.dart';
@@ -31,8 +34,13 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
   final _validator = const ListingDraftValidator();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _titleFocus = FocusNode();
-  final _descriptionFocus = FocusNode();
+  final _titleFocus = FocusNode(debugLabel: 'Title');
+  final _descriptionFocus = FocusNode(debugLabel: 'Description');
+  final _categoryFocus = FocusNode(debugLabel: 'Category');
+  final _areaFocus = FocusNode(debugLabel: 'Approximate area');
+  final _contactFocus = FocusNode(debugLabel: 'Contact preference');
+  final _deadlineFocus = FocusNode(debugLabel: 'Deadline');
+  final _submitFocus = FocusNode(debugLabel: 'Post listing');
 
   late final CreateListingViewModel _viewModel;
   ListingKind _kind = ListingKind.need;
@@ -55,6 +63,11 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
     _descriptionController.dispose();
     _titleFocus.dispose();
     _descriptionFocus.dispose();
+    _categoryFocus.dispose();
+    _areaFocus.dispose();
+    _contactFocus.dispose();
+    _deadlineFocus.dispose();
+    _submitFocus.dispose();
     super.dispose();
   }
 
@@ -102,31 +115,45 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                             ),
                       ),
                       const SizedBox(height: 28),
-                      Text(
-                        'What are you posting?',
-                        style: Theme.of(context).textTheme.titleSmall,
+                      AccessibleHeading(
+                        level: 2,
+                        child: Text(
+                          'What are you posting?',
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
                       ),
                       const SizedBox(height: 8),
-                      SegmentedButton<ListingKind>(
-                        expandedInsets: EdgeInsets.zero,
-                        segments: const [
-                          ButtonSegment(
-                            value: ListingKind.need,
-                            icon: Icon(Icons.search),
-                            label: Text('I need something'),
-                          ),
-                          ButtonSegment(
-                            value: ListingKind.offer,
-                            icon: Icon(Icons.volunteer_activism_outlined),
-                            label: Text('I’m offering something'),
-                          ),
-                        ],
-                        selected: {_kind},
-                        onSelectionChanged: submitting
-                            ? null
-                            : (selection) {
-                                setState(() => _kind = selection.single);
-                              },
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final direction = _kindSelectorDirection(
+                            context,
+                            constraints.maxWidth,
+                          );
+                          return SegmentedButton<ListingKind>(
+                            direction: direction,
+                            expandedInsets: direction == Axis.horizontal
+                                ? EdgeInsets.zero
+                                : null,
+                            segments: const [
+                              ButtonSegment(
+                                value: ListingKind.need,
+                                icon: Icon(Icons.search),
+                                label: Text('I need something'),
+                              ),
+                              ButtonSegment(
+                                value: ListingKind.offer,
+                                icon: Icon(Icons.volunteer_activism_outlined),
+                                label: Text('I’m offering something'),
+                              ),
+                            ],
+                            selected: {_kind},
+                            onSelectionChanged: submitting
+                                ? null
+                                : (selection) {
+                                    setState(() => _kind = selection.single);
+                                  },
+                          );
+                        },
                       ),
                       const SizedBox(height: 24),
                       TextFormField(
@@ -169,6 +196,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                       const SizedBox(height: 12),
                       DropdownButtonFormField<ListingCategory>(
                         key: _categoryKey,
+                        focusNode: _categoryFocus,
                         isExpanded: true,
                         initialValue: _category,
                         decoration: const InputDecoration(
@@ -191,6 +219,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                       const SizedBox(height: 16),
                       DropdownButtonFormField<ApproximateArea>(
                         key: _areaKey,
+                        focusNode: _areaFocus,
                         isExpanded: true,
                         initialValue: _area,
                         decoration: const InputDecoration(
@@ -214,6 +243,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                       const SizedBox(height: 16),
                       DropdownButtonFormField<ContactPreference>(
                         key: _contactKey,
+                        focusNode: _contactFocus,
                         isExpanded: true,
                         initialValue: _contactPreference,
                         decoration: const InputDecoration(
@@ -242,56 +272,65 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                         validator: (value) =>
                             _validator.activeUntilError(value, widget.clock()),
                         builder: (field) {
-                          return InkWell(
-                            onTap: submitting ? null : _pickDeadline,
-                            borderRadius: BorderRadius.circular(4),
-                            child: InputDecorator(
-                              decoration: InputDecoration(
-                                labelText: _kind.activeUntilLabel,
-                                errorText: field.errorText,
-                                border: const OutlineInputBorder(),
-                                suffixIcon:
-                                    const Icon(Icons.calendar_month_outlined),
-                                enabled: !submitting,
-                              ),
-                              child: Text(
-                                _activeUntil == null
-                                    ? 'Choose date and time'
-                                    : _formatDeadline(context, _activeUntil!),
+                          final callback = submitting ? null : _pickDeadline;
+                          final value = _activeUntil == null
+                              ? 'Not selected'
+                              : _formatDeadline(context, _activeUntil!);
+                          final hint = [
+                            if (field.errorText != null) field.errorText!,
+                            'Choose date and time',
+                          ].join('. ');
+
+                          return Semantics(
+                            container: true,
+                            button: true,
+                            enabled: !submitting,
+                            focusable: !submitting,
+                            focused: _deadlineFocus.hasFocus,
+                            label: _kind.activeUntilLabel,
+                            value: value,
+                            hint: hint,
+                            onTapHint: 'Choose date and time',
+                            validationResult: field.hasError
+                                ? SemanticsValidationResult.invalid
+                                : SemanticsValidationResult.valid,
+                            onTap: callback,
+                            onFocus:
+                                submitting ? null : _deadlineFocus.requestFocus,
+                            child: ExcludeSemantics(
+                              child: InkWell(
+                                key: const Key('deadline-control'),
+                                focusNode: _deadlineFocus,
+                                canRequestFocus: !submitting,
+                                onFocusChange: (_) => setState(() {}),
+                                onTap: callback,
+                                borderRadius: BorderRadius.circular(4),
+                                child: InputDecorator(
+                                  decoration: InputDecoration(
+                                    labelText: _kind.activeUntilLabel,
+                                    errorText: field.errorText,
+                                    border: const OutlineInputBorder(),
+                                    suffixIcon: const Icon(
+                                      Icons.calendar_month_outlined,
+                                    ),
+                                    enabled: !submitting,
+                                  ),
+                                  child: Text(
+                                    _activeUntil == null
+                                        ? 'Choose date and time'
+                                        : _formatDeadline(
+                                            context,
+                                            _activeUntil!,
+                                          ),
+                                  ),
+                                ),
                               ),
                             ),
                           );
                         },
                       ),
                       const SizedBox(height: 24),
-                      Semantics(
-                        liveRegion: submitting,
-                        label: submitting ? 'Posting listing' : null,
-                        child: SizedBox(
-                          width: double.infinity,
-                          child: FilledButton.icon(
-                            onPressed: submitting ? null : _submit,
-                            style: FilledButton.styleFrom(
-                              minimumSize: const Size.fromHeight(52),
-                            ),
-                            icon: submitting
-                                ? const SizedBox.square(
-                                    dimension: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Icon(Icons.add_circle_outline),
-                            label: Text(
-                              submitting
-                                  ? 'Posting…'
-                                  : _kind == ListingKind.need
-                                      ? 'Post need'
-                                      : 'Post offer',
-                            ),
-                          ),
-                        ),
-                      ),
+                      _buildSubmitButton(submitting),
                     ],
                   ),
                 ),
@@ -300,6 +339,68 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
           ),
         );
       },
+    );
+  }
+
+  Axis _kindSelectorDirection(BuildContext context, double availableWidth) {
+    final style = Theme.of(context).textTheme.labelLarge;
+    final scaler = MediaQuery.textScalerOf(context);
+    double labelWidth(String label) {
+      final painter = TextPainter(
+        text: TextSpan(text: label, style: style),
+        textDirection: TextDirection.ltr,
+        textScaler: scaler,
+        maxLines: 1,
+      )..layout();
+      final width = painter.width;
+      painter.dispose();
+      return width;
+    }
+
+    final contentWidth = labelWidth('I need something') +
+        labelWidth('I’m offering something') +
+        152;
+    return contentWidth <= availableWidth ? Axis.horizontal : Axis.vertical;
+  }
+
+  Widget _buildSubmitButton(bool submitting) {
+    final button = SizedBox(
+      width: double.infinity,
+      child: FilledButton.icon(
+        focusNode: _submitFocus,
+        onPressed: submitting ? null : _submit,
+        style: FilledButton.styleFrom(
+          minimumSize: const Size.fromHeight(52),
+        ),
+        icon: submitting
+            ? const ExcludeSemantics(
+                child: SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
+            : const Icon(Icons.add_circle_outline),
+        label: Text(
+          submitting
+              ? 'Posting…'
+              : _kind == ListingKind.need
+                  ? 'Post need'
+                  : 'Post offer',
+        ),
+      ),
+    );
+
+    if (!submitting) {
+      return button;
+    }
+
+    return Semantics(
+      container: true,
+      button: true,
+      enabled: false,
+      liveRegion: true,
+      label: 'Posting listing',
+      child: ExcludeSemantics(child: button),
     );
   }
 
@@ -318,6 +419,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
       lastDate: lastDate,
     );
     if (date == null || !mounted) {
+      _restoreDeadlineFocus();
       return;
     }
 
@@ -326,6 +428,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
       initialTime: TimeOfDay.fromDateTime(current),
     );
     if (time == null || !mounted) {
+      _restoreDeadlineFocus();
       return;
     }
 
@@ -341,6 +444,15 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
     if (_showValidation) {
       _deadlineKey.currentState?.validate();
     }
+    _restoreDeadlineFocus();
+  }
+
+  void _restoreDeadlineFocus() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _deadlineFocus.requestFocus();
+      }
+    });
   }
 
   Future<void> _submit() async {
@@ -377,6 +489,10 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
     _showMessage(
       _viewModel.failureMessage ?? CreateListingViewModel.createFailureMessage,
     );
+    await WidgetsBinding.instance.endOfFrame;
+    if (mounted) {
+      _submitFocus.requestFocus();
+    }
   }
 
   Future<void> _focusFirstInvalidField() async {
@@ -397,34 +513,41 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
       ),
       (
         context: _categoryKey.currentContext,
-        focusNode: null,
+        focusNode: _categoryFocus,
         hasError: _categoryKey.currentState?.hasError ?? false,
       ),
       (
         context: _areaKey.currentContext,
-        focusNode: null,
+        focusNode: _areaFocus,
         hasError: _areaKey.currentState?.hasError ?? false,
       ),
       (
         context: _contactKey.currentContext,
-        focusNode: null,
+        focusNode: _contactFocus,
         hasError: _contactKey.currentState?.hasError ?? false,
       ),
       (
         context: _deadlineKey.currentContext,
-        focusNode: null,
+        focusNode: _deadlineFocus,
         hasError: _deadlineKey.currentState?.hasError ?? false,
       ),
     ];
 
+    await WidgetsBinding.instance.endOfFrame;
     for (final field in invalidFields) {
       if (!field.hasError) {
         continue;
       }
-      field.focusNode?.requestFocus();
       final context = field.context;
-      if (context != null) {
-        await Scrollable.ensureVisible(context);
+      if (context != null && context.mounted) {
+        await Scrollable.ensureVisible(
+          context,
+          duration: const Duration(milliseconds: 200),
+          alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+        );
+      }
+      if (mounted) {
+        field.focusNode?.requestFocus();
       }
       return;
     }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vihar_loop/core/accessibility/accessible_heading.dart';
 import 'package:vihar_loop/data/listing_repository.dart';
 import 'package:vihar_loop/domain/listing.dart';
 import 'package:vihar_loop/features/listing_details/listing_details_view_model.dart';
@@ -61,11 +62,15 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
                 children: [
                   _StateLabels(listing: listing),
                   const SizedBox(height: 16),
-                  Text(
-                    listing.title,
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
+                  AccessibleHeading(
+                    level: 1,
+                    child: Text(
+                      listing.title,
+                      style:
+                          Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                    ),
                   ),
                   const SizedBox(height: 16),
                   Text(
@@ -103,11 +108,14 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
                     value: listing.status.label,
                   ),
                   const Divider(height: 32),
-                  Text(
-                    'Your activity',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
+                  AccessibleHeading(
+                    level: 2,
+                    child: Text(
+                      'Your activity',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -196,6 +204,7 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
+          scrollable: true,
           title: const Text('Close this listing?'),
           content: const Text(
             'It will stay on this device and can be reopened later.',
@@ -267,42 +276,56 @@ class _StateLabels extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        Chip(
-          avatar: Icon(
-            listing.kind == ListingKind.need
-                ? Icons.search
-                : Icons.volunteer_activism_outlined,
-          ),
-          label: Text(listing.kind.label),
+    final semanticLabel = [
+      listing.kind.label,
+      listing.status.label,
+      if (listing.isSaved) 'Saved',
+      if (listing.isContacted) 'Contacted',
+      if (listing.origin == ListingOrigin.local) 'Your post',
+    ].join('. ');
+
+    return Semantics(
+      container: true,
+      label: semanticLabel,
+      child: ExcludeSemantics(
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            Chip(
+              avatar: Icon(
+                listing.kind == ListingKind.need
+                    ? Icons.search
+                    : Icons.volunteer_activism_outlined,
+              ),
+              label: Text(listing.kind.label),
+            ),
+            Chip(
+              avatar: Icon(
+                listing.status == ListingStatus.open
+                    ? Icons.radio_button_checked
+                    : Icons.check_circle_outline,
+              ),
+              label: Text(listing.status.label),
+            ),
+            if (listing.isSaved)
+              const Chip(
+                avatar: Icon(Icons.bookmark),
+                label: Text('Saved'),
+              ),
+            if (listing.isContacted)
+              const Chip(
+                avatar: Icon(Icons.forum_outlined),
+                label: Text('Contacted'),
+              ),
+            if (listing.origin == ListingOrigin.local)
+              const Chip(
+                avatar: Icon(Icons.person_outline),
+                label: Text('Your post'),
+              ),
+          ],
         ),
-        Chip(
-          avatar: Icon(
-            listing.status == ListingStatus.open
-                ? Icons.radio_button_checked
-                : Icons.check_circle_outline,
-          ),
-          label: Text(listing.status.label),
-        ),
-        if (listing.isSaved)
-          const Chip(
-            avatar: Icon(Icons.bookmark),
-            label: Text('Saved'),
-          ),
-        if (listing.isContacted)
-          const Chip(
-            avatar: Icon(Icons.forum_outlined),
-            label: Text('Contacted'),
-          ),
-        if (listing.origin == ListingOrigin.local)
-          const Chip(
-            avatar: Icon(Icons.person_outline),
-            label: Text('Your post'),
-          ),
-      ],
+      ),
     );
   }
 }
@@ -383,27 +406,33 @@ class _DetailRow extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: scheme.primary),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
+      child: Semantics(
+        container: true,
+        label: '$label, $value',
+        child: ExcludeSemantics(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: scheme.primary),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(value, style: Theme.of(context).textTheme.bodyLarge),
+                  ],
                 ),
-                const SizedBox(height: 4),
-                Text(value, style: Theme.of(context).textTheme.bodyLarge),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

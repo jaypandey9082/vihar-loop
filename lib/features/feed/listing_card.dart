@@ -30,12 +30,15 @@ class ListingCard extends StatelessWidget {
       if (listing.isSaved) 'Saved',
       if (listing.isContacted) 'Contacted',
       if (listing.origin == ListingOrigin.local) 'Your post',
-      'Open details',
     ].join('. ');
 
     return Semantics(
+      container: true,
       button: true,
+      enabled: true,
       label: semanticLabel,
+      onTapHint: 'Open listing details',
+      onTap: onTap,
       child: ExcludeSemantics(
         child: Card(
           clipBehavior: Clip.antiAlias,
@@ -153,12 +156,14 @@ class _Label extends StatelessWidget {
           children: [
             Icon(icon, size: 16, color: foreground),
             const SizedBox(width: 6),
-            Text(
-              text,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: foreground,
-                    fontWeight: FontWeight.w600,
-                  ),
+            Flexible(
+              child: Text(
+                text,
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: foreground,
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
             ),
           ],
         ),

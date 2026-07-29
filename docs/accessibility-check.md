@@ -1,64 +1,84 @@
 # Accessibility check
 
-Section 4 adds a full labeled creation form and filter controls while retaining
-the separate Saved and Contacted controls on details. Visible errors remain in
-the form, posting exposes progress, and controls are disabled only while a
-submission or mutation is finishing.
+## Scope and target
 
-## Section 1 baseline
+Section 5 audits the existing feed, filters, cards, create form, deadline,
+details actions, dialogs, temporary messages, and route transitions. It adds no
+product feature and changes no repository, record, encryption, seed, or
+security behaviour. Android/API 36 is the primary runtime target; iOS receives
+source-level widget and guideline coverage.
 
-Section 1 uses standard Material navigation and controls, visible Need/Offer
-and Open/Closed wording, comfortably padded cards, a logical top-to-bottom
-reading order, and no image-based text. Loading, empty, and error states
-contain explicit readable copy. Text scaling is not manually capped.
+## Evidence
 
-Each listing card is exposed as one button-like semantic node. Its label
-includes the listing kind, title, category, broad area, relevant time wording,
-status, and the action to open details. Visible descendants are excluded from
-the semantics tree to prevent the same information being announced twice.
+| Requirement | Implementation | Automated evidence | Manual evidence | Status |
+| --- | --- | --- | --- | --- |
+| Feed structure and states | Level 1/2 headings, one loading live region, readable counts, named recovery actions, decorative icons excluded | Loading, ready, filtered/genuine empty, error, Retry, headings, count, and traversal tests | Ready and filtered feed rendered with TalkBack active | Done |
+| Listing-card action | One concise button node owns `SemanticsAction.tap`; visual InkWell remains pointer-operable | Semantic tap opens the correct listing; label/state tests pass | API 36 opened the USB-C listing with TalkBack active and showed “Listing details” | Done |
+| Filters | Standard ChoiceChip selected state and actions retained; groups wrap | Offers, Ending soon, Clear filters, selected-state, keyboard, and traversal tests pass | Offers and Ending soon changed the feed on the TalkBack-enabled AVD | Done |
+| Heading navigation | Shared level 1–6 wrapper sets both `header` and `headingLevel` | Feed, empty/error, create, listing-title, and activity heading tests pass; body copy is not marked heading | TalkBack focus visibly reached feed and details context | Done |
+| First-invalid focus | Dedicated nodes for all six required fields; validation waits for the rendered frame, scrolls, and requests focus | Independent Title, Description, Category, Area, Contact, and Deadline focus tests pass | Complete TalkBack invalid-field walkthrough could not be controlled reliably from the host | Implemented, manual verification pending |
+| Deadline | One focusable semantic button exposes label, value, hint, action, and `SemanticsValidationResult` | Semantic action opens picker; invalid/valid and focus-return tests pass; keyboard Space works | Date/time picker TalkBack walkthrough not completed | Implemented, manual verification pending |
+| Posting and failures | One disabled live-region status; children excluded; failure restores Post focus and values | Pending, disabled, failure, recovery, and valid semantic-submit tests pass | Posting speech not manually observed | Implemented, manual verification pending |
+| Details and actions | Title/activity headings; one state summary; label/value metadata rows; existing action boundaries retained | Save, Contacted, Close, Keep open, confirm, Reopen, pending, SnackBar, and dialog traversal tests pass | Save changed to Saved and Display speech output showed “Saved on this device.” | Done |
+| Tap targets and labels | Actual target geometry and semantics fixed where needed | Official Android, iOS, and labeled-target guidelines pass across critical states | Visual device inspection found no inaccessible small product target | Done |
+| Contrast | Existing ColorScheme roles retained | Official text-contrast guideline passes tested light and dark states | No Accessibility Scanner or manual ratio claim | Done |
+| Traversal and keyboard | Natural widget order retained; no numeric focus order | Simulated feed/create/details/empty/dialog traversal and Tab/Shift+Tab/Enter/Space tests pass | Emulator keyboard was usable; complete Switch Access pass not performed | Done |
+| Large text and display | Segmented control measures scaled labels and becomes vertical; cards/dialogs remain flexible/scrollable | 320×568 and 568×320 at 200%, long content, form errors, pending, and dialog tests pass | API 36 at font scale 1.3 and density 560 showed vertical create choices without crash/overflow | Done |
 
-The card remains one semantic button because its only action is Open details.
-Its summary conditionally includes Saved, Contacted, and Your post when those
-states are active. Save and Contacted live on the details screen as separate
-focusable controls rather than adding competing card actions.
+## Automated checks
 
-## Check status
+The dedicated `test/accessibility/` suite contains 31 tests. It uses
+`tester.ensureSemantics()`, official Flutter accessibility guidelines,
+`simulatedAccessibilityTraversal`, semantic actions, focus assertions, and
+logical keyboard events. The full repository suite contains 148 tests.
 
-| Check | Planned | Implemented | Verified |
-| --- | --- | --- | --- |
-| Need, Offer, Open, and Closed are visible text | Yes | Yes | Automated widget assertion passed |
-| Listing card has a meaningful button semantic summary | Yes | Yes | Semantics test and API 36 UI-hierarchy smoke passed |
-| Loading state has a readable live-region label | Yes | Yes | Manual screen-reader verification pending |
-| Empty state has a heading and supporting copy | Yes | Yes | Automated widget assertion passed |
-| Error copy hides technical details and Retry is named | Yes | Yes | Retry widget test passed |
-| Feed supports approximately 200% text scaling | Yes | Yes | Layout test passed without exceptions |
-| Details supports approximately 200% text scaling | Yes | Yes | Action layout test passed without exceptions |
-| Create form supports approximately 200% text scaling | Yes | Yes | Widget layout and completion test passed |
-| Card tap target is comfortably large | Yes | Yes | Visual/manual measurement pending |
-| Logical focus and reading order | Yes | Yes | Manual TalkBack verification pending |
-| Dark-theme contrast | Yes | Theme-derived colours used | Manual contrast verification pending |
-| Create fields have persistent visible labels | Yes | Yes | Automated structure assertions passed |
-| Create-form errors are visible text | Yes | Yes | Widget validation and API 36 incomplete-submit checks passed |
-| Keyboard flow reaches multiline description and Next/Done actions | Yes | Yes | Input actions configured; physical-keyboard manual pass pending |
-| Deadline control has an understandable label and value | Yes | Yes | Widget semantics/visible-text coverage passed |
-| Posting progress is meaningful and blocks duplicate input | Yes | Yes | View-model and widget pending-state tests passed |
-| Type/time filters expose selected states | Yes | Yes | Material ChoiceChip selected state and interaction tests passed |
-| Filtered empty state explains how to recover | Yes | Yes | Automated widget assertion passed |
-| Separate Save and Contacted semantics and toggled state | Yes | Yes | Automated semantics and interaction tests passed |
-| Active Saved, Contacted, and Your post in card summary | Yes | Yes | Automated semantics test passed |
-| Accessible Close confirmation | Yes | Yes for local records | Dialog test and production-created API 36 flow pass |
+Guideline coverage runs `androidTapTargetGuideline`,
+`iOSTapTargetGuideline`, `labeledTapTargetGuideline`, and
+`textContrastGuideline` across representative feed, create, details, pending,
+dialog, empty/error, light, and dark states. The tests initially exposed a
+200%-scale card-chip overflow and a short-landscape dialog overflow; flexible
+chip text and a scrollable dialog fixed those observed issues.
 
-Automatically verified checks include visible create labels/errors, pending and
-duplicate-submission behavior, filter interaction/empty state, semantic card
-summaries, and create/feed/details layouts at approximately 200% text scale.
-Manual API 36 verification covered the visual create, filter, close/reopen, and
-relaunch flow without visible overflow or crash.
+## TalkBack environment and observations
 
-No manual TalkBack or VoiceOver verification has been performed through Section 4.
-The Android emulator confirmed that cards are exposed as buttons with the
-expected combined descriptions, but this is not a substitute for listening to
-the flow with TalkBack. Before final submission, test the complete flow with
-TalkBack on the target Android device, including create field-error focus,
-date/time picker announcements, filter selected states, posting progress,
-filtered empty recovery, and close confirmation. Also inspect large-text
-layouts beyond 200%, check contrast, and verify focus after navigation.
+- AVD/device: `vihar_loop_api_36`, `sdk_gphone64_arm64`, Android API 36,
+  1080×2400, physical density 420
+- TalkBack: `com.google.android.marvin.talkback`, version
+  `16.0.0.738667889` (`60149341`)
+- App: ViharLoop `0.5.0` (`5`)
+- Normal settings: font scale 1.0, density 420
+- Large-settings pass: font scale 1.3, override density 560
+- Display speech output: enabled for the pass
+- Network: airplane mode for the cleared-data launch
+
+Observed, not inferred:
+
+- TalkBack was bound and its green accessibility focus was visible on feed and
+  details.
+- Offers and Ending soon updated their selected state and count; Clear filters
+  recovered the feed.
+- Activating the first card opened the matching USB-C details screen.
+- Details metadata remained visible as label/value pairs with no icon-only
+  action.
+- Saving changed the visible control to Saved, and speech output displayed
+  “Saved on this device.”
+- At font scale 1.3/density 560, the create Need/Offer control became vertical;
+  required content remained reachable by scrolling and no app crash/ANR was
+  logged.
+
+This is representative real-emulator TalkBack evidence, not a claim that the
+entire manual acceptance script passed. ADB-injected gestures did not provide
+reliable TalkBack swipe/double-tap control, the visible emulator window was not
+addressable by the available Mac automation layer, and the windowed AVD also
+encountered the previously observed System UI responsiveness issue. Therefore
+invalid-field speech, both pickers, posting, Contacted, and close-dialog speech
+remain manual verification pending. Their semantics actions, traversal,
+keyboard behaviour, states, and messages are covered automatically.
+
+Google Accessibility Scanner was not installed on the AVD. No random or
+unofficial APK was downloaded, so Scanner verification is unavailable.
+Grayscale/color-correction manual inspection was not completed.
+
+VoiceOver was not tested because full Xcode is unavailable. No assistive-
+technology user study was performed, and this document does not claim WCAG
+certification.

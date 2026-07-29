@@ -8,7 +8,7 @@ offers without sharing an exact address.
 
 ## Current status
 
-This repository contains the Section 4 listing-creation and Today Loop slice.
+This repository contains the Section 5 accessibility-hardened core flow.
 The feed, creation form, and listing details use `LocalListingRepository` with
 an encrypted Hive CE box. People can create a need or offer, find it with
 Today or Ending Soon filters, save it, privately mark it contacted, and
@@ -19,7 +19,7 @@ FlutterSecureStorage.
 - Primary demo platform: Android
 - Secondary supported shell: iOS
 - Framework: Flutter with Material 3
-- Product version: `0.4.0+4`
+- Product version: `0.5.0+5`
 - Current data: nine fictional listings seeded only when seed version 1 is absent
 - Persistence: complete versioned records in encrypted Hive CE
 - Key storage: FlutterSecureStorage, with no key in source or the Hive box
@@ -45,7 +45,25 @@ Need/Offer and time filters combine.
 
 Direct storage dependencies resolve to `hive_ce 2.19.3`,
 `hive_ce_flutter 2.3.4`, and `flutter_secure_storage 10.3.1`.
-Section 4 added or upgraded no dependency and left `pubspec.lock` unchanged.
+Section 5 added or upgraded no dependency and left `pubspec.lock` unchanged.
+
+Section 5 keeps product and persistence behaviour unchanged while adding
+deliberate heading structure, executable listing-card semantics, first-invalid
+form focus, one coherent keyboard-accessible deadline control, and adaptive
+Need/Offer layout. Official Flutter guideline tests cover Android and iOS tap
+targets, labels, and light/dark text contrast. Dedicated tests also exercise
+semantic actions, traversal order, keyboard input, validation focus, and
+representative 200% text layouts.
+
+Android TalkBack 16.0 on the existing API 36 emulator exposed feed and details
+focus, opened a listing, and announced the Save success message. The same AVD
+was checked at `font_scale 1.3` and density `560`; the create segmented control
+adapted vertically without a crash or overflow. Reliable remote TalkBack
+multi-gesture control was not available for the complete create, picker,
+progress, and close-dialog walkthrough, so those manual items remain pending
+even though their automated semantics and keyboard checks pass. Google
+Accessibility Scanner was not installed on the AVD; no unofficial APK was
+sideloaded.
 
 ## Requirements
 
@@ -115,7 +133,8 @@ The current core demo runs in airplane mode: open the Vidyavihar feed, create
 a listing, find it under Ending Soon, inspect it, close it, relaunch to prove
 encrypted persistence, reopen it, and relaunch again. Saved and Contacted
 remain available as private local markers. Android creation, close/reopen, and
-force-stop/relaunch are manually checked in the Section 4 verification pass.
+force-stop/relaunch were manually checked in the Section 4 verification pass.
+Section 5 adds the automated and partial TalkBack evidence described above.
 Draft Assist remains planned and is not part of this working loop.
 
 Deleting ViharLoop or clearing its app data removes both the local encryption
@@ -124,13 +143,14 @@ disabled for this local-only slice.
 
 ## Known gaps
 
-Section 4 does not yet include:
+The current slice does not yet include:
 
 - User-facing local-data reset
 - Broader exact-address and privacy hardening
 - A deterministic AI fallback
 - Gemma or another local model
-- Final accessibility audit and manual TalkBack
+- Completion of the full manual TalkBack create/picker/progress/dialog pass
+- Manual VoiceOver verification
 - Full iOS runtime and Keychain verification
 - Editing or deleting one listing
 - Draft persistence
