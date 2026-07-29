@@ -2,9 +2,9 @@
 
 ## Scope and target
 
-Section 5 established the core accessibility baseline. Section 6 preserves it
-and adds the Privacy & data route, reset confirmation, pending state, failure
-recovery, and feed entry points. Android/API 36 is the primary runtime target;
+Section 5 established the core accessibility baseline. Sections 6 and 7
+preserve it and add Privacy & data plus Draft Assist. Android/API 36 is the
+primary runtime target;
 iOS receives source-level widget and guideline coverage.
 
 ## Evidence
@@ -24,13 +24,14 @@ iOS receives source-level widget and guideline coverage.
 | Traversal and keyboard | Natural widget order retained; no numeric focus order | Simulated feed/create/details/empty/dialog traversal and Tab/Shift+Tab/Enter/Space tests pass | Emulator keyboard was usable; complete Switch Access pass not performed | Done |
 | Large text and display | Segmented control measures scaled labels and becomes vertical; cards/dialogs remain flexible/scrollable | 320×568 and 568×320 at 200%, long content, form errors, pending, and dialog tests pass | API 36 at font scale 1.3 and density 560 showed vertical create choices without crash/overflow | Done |
 | Privacy & data | Route title plus level-2 headings; visible reset label; scrollable confirmation; one live pending state; retryable visible failure; Back blocked only while pending | Ready/empty/error semantic entry, heading/traversal/dialog/action/pending/failure tests; Android/iOS targets, labels, light/dark contrast, 200% portrait/landscape, and 320-pixel width pass | Full reset sequence with TalkBack gesture control remains pending | Implemented, manual verification pending |
+| Draft Assist | Level-2 section heading, semantic Suggest action, disabled pending live region, one concise result announcement, level-3 preview heading, labeled Type/Title/Category/Source rows, and semantic Use/Dismiss actions | Semantic activation, pending/result/failure live regions, preview traversal, source row, Apply-to-Title focus, long Title, Other category, wrapped buttons, official target/label/contrast checks, and 200% portrait/landscape/320-width coverage | Full human-driven Draft Assist TalkBack sequence remains pending | Implemented, manual verification pending |
 
 ## Automated checks
 
-The dedicated `test/accessibility/` suite contains 38 tests. It uses
+The dedicated `test/accessibility/` suite contains 39 tests. It uses
 `tester.ensureSemantics()`, official Flutter accessibility guidelines,
 `simulatedAccessibilityTraversal`, semantic actions, focus assertions, and
-logical keyboard events. The full repository suite contains 246 tests.
+logical keyboard events. The full repository suite contains 311 tests.
 
 Guideline coverage runs `androidTapTargetGuideline`,
 `iOSTapTargetGuideline`, `labeledTapTargetGuideline`, and

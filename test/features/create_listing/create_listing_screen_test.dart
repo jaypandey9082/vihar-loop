@@ -8,6 +8,11 @@ import 'package:vihar_loop/domain/listing_draft.dart';
 import 'package:vihar_loop/domain/listing_draft_validator.dart';
 import 'package:vihar_loop/features/create_listing/create_listing_screen.dart';
 import 'package:vihar_loop/features/create_listing/create_listing_view_model.dart';
+import 'package:vihar_loop/local_ai/listing_suggestion.dart';
+import 'package:vihar_loop/local_ai/local_ai_service.dart';
+import 'package:vihar_loop/local_ai/rule_based_listing_assistant.dart';
+
+import '../../support/test_local_ai_service.dart';
 
 void main() {
   final now = DateTime(2026, 7, 30, 12);
@@ -204,8 +209,9 @@ void main() {
     await tester.pump();
     expect(find.text('Posting…'), findsOneWidget);
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
-    final title =
-        tester.widget<TextFormField>(find.byType(TextFormField).first);
+    final title = tester.widget<TextFormField>(
+      find.byType(TextFormField, skipOffstage: false).first,
+    );
     expect(title.enabled, isFalse);
 
     await tester.tap(find.text('Posting…'));
@@ -258,8 +264,321 @@ void main() {
     );
     await _scrollTo(tester, 'Post need');
 
-    expect(find.text('Post need'), findsOneWidget);
+    expect(find.text('Post need', skipOffstage: false), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Draft Assist is optional and validates Description only',
+      (tester) async {
+    final service = TestLocalAiService();
+    await _openForm(
+      tester,
+      _FormRepository(),
+      now,
+      localAiService: service,
+    );
+
+    expect(find.text('Draft Assist'), findsOneWidget);
+    expect(
+      find.textContaining('nothing is posted automatically'),
+      findsOneWidget,
+    );
+    expect(find.text('Suggest type, title & category'), findsOneWidget);
+    await _scrollTo(tester, 'Post need');
+    expect(find.text('Post need'), findsOneWidget);
+    await _scrollTo(tester, 'Draft Assist');
+    expect(find.textContaining('Gemma'), findsNothing);
+    expect(find.textContaining('model'), findsNothing);
+
+    await tester.tap(find.text('Suggest type, title & category'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Describe what you need or are offering.'),
+      findsOneWidget,
+    );
+    expect(service.requests, isEmpty);
+    final description = tester.widget<EditableText>(
+      find.descendant(
+        of: find.byType(TextFormField).last,
+        matching: find.byType(EditableText),
+      ),
+    );
+    expect(description.focusNode.hasFocus, isTrue);
+
+    await tester.enterText(
+      find.byType(TextFormField).last,
+      'Collect from Flat 302, Wing B after class.',
+    );
+    await _scrollTo(tester, 'Suggest type, title & category');
+    await tester.tap(find.text('Suggest type, title & category'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text(ListingDraftValidator.preciseLocationError),
+      findsOneWidget,
+    );
+    expect(service.requests, isEmpty);
+  });
+
+  testWidgets('pending suggestion is local, scoped, and blocks duplicates',
+      (tester) async {
+    final pending = Completer<ListingSuggestion>();
+    final service = TestLocalAiService(pending: pending);
+    final repository = _FormRepository();
+    await _openForm(
+      tester,
+      repository,
+      now,
+      localAiService: service,
+    );
+    await tester.enterText(
+      find.byType(TextFormField).last,
+      'Need a guitar capo for rehearsal near Somaiya today.',
+    );
+    await _scrollTo(tester, 'Suggest type, title & category');
+    await tester.tap(find.text('Suggest type, title & category'));
+    await tester.pump();
+
+    expect(find.text('Suggesting…'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(
+      tester
+          .widget<TextFormField>(
+            find.byType(TextFormField, skipOffstage: false).last,
+          )
+          .enabled,
+      isFalse,
+    );
+    expect(
+      tester
+          .widget<SegmentedButton<ListingKind>>(
+            find.byType(
+              SegmentedButton<ListingKind>,
+              skipOffstage: false,
+            ),
+          )
+          .onSelectionChanged,
+      isNull,
+    );
+    expect(find.byType(BackButton), findsOneWidget);
+    await tester.tap(find.text('Suggesting…'));
+    expect(service.requests, hasLength(1));
+    expect(repository.drafts, isEmpty);
+
+    pending.complete(service.result);
+    await tester.pumpAndSettle();
+    expect(find.text('Suggested details'), findsOneWidget);
+  });
+
+  testWidgets('preview does not mutate fields; apply changes only three fields',
+      (tester) async {
+    const suggestion = ListingSuggestion(
+      kind: ListingKind.offer,
+      title: 'Statistics notes',
+      category: ListingCategory.booksAndStudy,
+      source: ListingSuggestionSource.deterministicFallback,
+    );
+    final service = TestLocalAiService(result: suggestion);
+    final repository = _FormRepository();
+    const description = 'Offering my statistics notes until tomorrow.';
+    await _openForm(
+      tester,
+      repository,
+      now,
+      localAiService: service,
+    );
+    await tester.enterText(find.byType(TextFormField).first, 'Manual title');
+    await tester.enterText(find.byType(TextFormField).last, description);
+    await _scrollTo(tester, 'Suggest type, title & category');
+    await tester.tap(find.text('Suggest type, title & category'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Suggested details'), findsOneWidget);
+    expect(
+      find.textContaining('Type: Offer', skipOffstage: false),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('Title: Statistics notes', skipOffstage: false),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('Category: Books & study', skipOffstage: false),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'Source: Built-in offline rules',
+        skipOffstage: false,
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Use suggestions', skipOffstage: false),
+      findsOneWidget,
+    );
+    expect(find.text('Dismiss', skipOffstage: false), findsOneWidget);
+    expect(
+      tester
+          .widget<TextFormField>(
+            find.byType(TextFormField, skipOffstage: false).first,
+          )
+          .controller
+          ?.text,
+      'Manual title',
+    );
+    expect(
+      tester
+          .widget<SegmentedButton<ListingKind>>(
+            find.byType(
+              SegmentedButton<ListingKind>,
+              skipOffstage: false,
+            ),
+          )
+          .selected,
+      {ListingKind.need},
+    );
+    expect(repository.drafts, isEmpty);
+
+    await _scrollTo(tester, 'Use suggestions');
+    await tester.tap(find.text('Use suggestions'));
+    await tester.pumpAndSettle();
+    expect(find.text('Suggested details'), findsNothing);
+    expect(
+      tester
+          .widget<TextFormField>(
+            find.byType(TextFormField, skipOffstage: false).first,
+          )
+          .controller
+          ?.text,
+      'Statistics notes',
+    );
+    expect(
+      tester
+          .widget<TextFormField>(
+            find.byType(TextFormField, skipOffstage: false).last,
+          )
+          .controller
+          ?.text,
+      description,
+    );
+    expect(
+      tester
+          .widget<SegmentedButton<ListingKind>>(
+            find.byType(
+              SegmentedButton<ListingKind>,
+              skipOffstage: false,
+            ),
+          )
+          .selected,
+      {ListingKind.offer},
+    );
+    expect(
+      find.text('Suggestions added. Review before posting.'),
+      findsOneWidget,
+    );
+    final titleEditable = tester.widget<EditableText>(
+      find.descendant(
+        of: find.byType(TextFormField, skipOffstage: false).first,
+        matching: find.byType(EditableText, skipOffstage: false),
+      ),
+    );
+    expect(titleEditable.focusNode.hasFocus, isTrue);
+    expect(repository.drafts, isEmpty);
+  });
+
+  testWidgets('dismiss and Description changes clear only transient preview',
+      (tester) async {
+    final service = TestLocalAiService();
+    final repository = _FormRepository();
+    await _openForm(
+      tester,
+      repository,
+      now,
+      localAiService: service,
+    );
+    await tester.enterText(find.byType(TextFormField).first, 'Manual title');
+    await tester.enterText(
+      find.byType(TextFormField).last,
+      'Need a guitar capo for rehearsal near Somaiya today.',
+    );
+    await _scrollTo(tester, 'Suggest type, title & category');
+    await tester.tap(find.text('Suggest type, title & category'));
+    await tester.pumpAndSettle();
+    await _scrollTo(tester, 'Dismiss');
+    await tester.tap(find.text('Dismiss'));
+    await tester.pumpAndSettle();
+    expect(find.text('Suggested details'), findsNothing);
+    expect(
+      tester
+          .widget<TextFormField>(
+            find.byType(TextFormField, skipOffstage: false).first,
+          )
+          .controller
+          ?.text,
+      'Manual title',
+    );
+
+    await _scrollTo(tester, 'Suggest type, title & category');
+    await tester.tap(find.text('Suggest type, title & category'));
+    await tester.pumpAndSettle();
+    expect(find.text('Suggested details'), findsOneWidget);
+    await tester.fling(
+      find.byType(ListView),
+      const Offset(0, 1200),
+      1200,
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byType(TextFormField).last,
+      'Need a guitar capo for another rehearsal tomorrow.',
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Suggested details'), findsNothing);
+    expect(repository.drafts, isEmpty);
+  });
+
+  testWidgets('friendly failure leaves manual form usable and retry works',
+      (tester) async {
+    final service = TestLocalAiService(
+      failure: StateError('technical local assistant failure'),
+    );
+    final repository = _FormRepository();
+    await _openForm(
+      tester,
+      repository,
+      now,
+      localAiService: service,
+    );
+    await tester.enterText(find.byType(TextFormField).first, 'Manual title');
+    await tester.enterText(
+      find.byType(TextFormField).last,
+      'Need a guitar capo for rehearsal near Somaiya today.',
+    );
+    await _scrollTo(tester, 'Suggest type, title & category');
+    await tester.tap(find.text('Suggest type, title & category'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(CreateListingViewModel.suggestionFailureCopy),
+      findsOneWidget,
+    );
+    expect(
+        find.textContaining('technical local assistant failure'), findsNothing);
+    expect(
+      tester
+          .widget<TextFormField>(
+            find.byType(TextFormField, skipOffstage: false).first,
+          )
+          .controller
+          ?.text,
+      'Manual title',
+    );
+    service.failure = null;
+    await tester.tap(find.text('Suggest type, title & category'));
+    await tester.pumpAndSettle();
+    expect(find.text('Suggested details'), findsOneWidget);
+    expect(service.requests, hasLength(2));
+    expect(repository.drafts, isEmpty);
   });
 }
 
@@ -269,6 +588,7 @@ Future<void> _openForm(
   DateTime now, {
   ValueChanged<Listing?>? onReturned,
   TextScaler textScaler = TextScaler.noScaling,
+  LocalAiService localAiService = const RuleBasedListingAssistant(),
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -285,6 +605,7 @@ Future<void> _openForm(
                   final listing = await Navigator.of(context).push<Listing>(
                     MaterialPageRoute(
                       builder: (_) => CreateListingScreen(
+                        localAiService: localAiService,
                         repository: repository,
                         clock: () => now,
                       ),

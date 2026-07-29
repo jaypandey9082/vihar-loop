@@ -8,7 +8,7 @@ offers without sharing an exact address.
 
 ## Current status
 
-This repository contains the Section 6 privacy- and security-hardened core flow.
+This repository contains the Section 7 offline Draft Assist core flow.
 The feed, creation form, and listing details use `LocalListingRepository` with
 an encrypted Hive CE box. People can create a need or offer, find it with
 Today or Ending Soon filters, save it, privately mark it contacted, and
@@ -19,12 +19,31 @@ FlutterSecureStorage.
 - Primary demo platform: Android
 - Secondary supported shell: iOS
 - Framework: Flutter with Material 3
-- Product version: `0.6.0+6`
+- Product version: `0.7.0+7`
 - Current data: nine fictional listings seeded only when seed version 1 is absent
 - Persistence: complete versioned records in encrypted Hive CE
 - Key storage: FlutterSecureStorage, with no key in source or the Hive box
 - UI scope: feed filters, creation, details, private Saved/Contacted markers,
-  owner-controlled Close/Reopen, and Privacy & data reset
+  owner-controlled Close/Reopen, Privacy & data reset, and optional Draft
+  Assist
+
+Draft Assist uses the Description to suggest only Type, Title, and Category.
+Section 7 production uses deterministic built-in offline rules behind an
+injected `LocalAiService`; it does not run a generative model. Suggestions are
+shown in a transient preview and change no form field until **Use
+suggestions** is activated. They remain editable, the manual form remains
+available, and nothing is stored until the normal **Post** action succeeds.
+Input and suggested Title reuse the existing privacy and draft validators.
+The flow works in airplane mode and adds no model, network call, secret,
+permission, package, or dependency. On-device Gemma integration remains
+Section 8 work behind the same service boundary.
+
+The API 36 upgrade check preserved all nine pre-existing listings. With
+airplane mode enabled, the guitar-capo Description produced the expected
+fallback preview, Dismiss left the form unchanged, Apply changed only Type,
+Title, and Category, and a manual Title edit remained intact. The completed
+listing became item 10 and survived force-stop/relaunch. A separate
+`Flat 302 Wing B` draft was rejected without producing a preview.
 
 Saved and Contacted are local device markers. Mark Contacted does not send a
 message. Close/Reopen is available only for records whose origin is `local`;
@@ -47,7 +66,7 @@ Need/Offer and time filters combine.
 
 Direct storage dependencies resolve to `hive_ce 2.19.3`,
 `hive_ce_flutter 2.3.4`, and `flutter_secure_storage 10.3.1`.
-Section 6 added or upgraded no dependency and left `pubspec.lock` unchanged.
+Section 7 added or upgraded no dependency and left `pubspec.lock` unchanged.
 
 Privacy & data is available from ready, empty, and storage-error feed states.
 It inventories on-device data, deliberately absent data, local-encryption
@@ -62,7 +81,7 @@ The release APK has no product INTERNET permission and no unnecessary
 location, contacts, phone, SMS, camera, microphone, broad storage,
 notification, or biometric permission. Debug/profile retain Flutter's
 tooling-only INTERNET permission. There is still no backend, network client,
-analytics, telemetry, or hosted AI key.
+analytics, telemetry, hosted AI key, or model file.
 
 Android TalkBack 16.0 on the existing API 36 emulator exposed feed and details
 focus, opened a listing, and announced the Save success message. The same AVD
@@ -110,12 +129,14 @@ lib/
   core/                 Shared production clock boundary
   domain/               Listing, draft validation, and timing rules
   features/create_listing/
-                        Create form and submission view model
+                        Create form, Draft Assist preview, and view model
   features/feed/        Feed view, view model, and listing card
   features/listing_details/
                         Details view and mutation view model
   features/privacy_data/
                         Privacy inventory and recoverable local-data reset
+  local_ai/             Service boundary, suggestion contract, validation,
+                        and deterministic offline implementation
   security/             Secure-storage encryption-key lifecycle
 test/                   Codec, key, store, repository, UI, semantics tests
 docs/                   Product, metrics, accessibility, security, AI, demo
@@ -123,8 +144,9 @@ docs/adr/               Architecture decision record
 ```
 
 `main.dart` constructs one shared clock, the secure key store, encrypted
-listing store, and local repository, then injects the boundaries into the app.
-Views do not import Hive, secure storage, or seed data.
+listing store, local repository, and `RuleBasedListingAssistant`, then injects
+the boundaries into the app. Views do not construct the assistant or import
+Hive, secure storage, or seed data.
 
 ## Documents
 
@@ -140,13 +162,12 @@ Views do not import Hive, secure storage, or seed data.
 
 ## Intended three-minute workflow
 
-The current core demo runs in airplane mode: open the Vidyavihar feed, create
-a listing, find it under Ending Soon, inspect it, close it, relaunch to prove
-encrypted persistence, reopen it, and relaunch again. Saved and Contacted
-remain available as private local markers. Android creation, close/reopen, and
-force-stop/relaunch were manually checked in the Section 4 verification pass.
-Section 6 adds privacy validation and reset evidence.
-Draft Assist remains planned and is not part of this working loop.
+The current demo runs in airplane mode: open Create, describe a guitar capo
+need, preview the suggested Type, Title, Category, and fallback source, dismiss
+once, suggest again, explicitly apply, edit the Title, complete the remaining
+manual fields, and Post. The resulting listing then participates in the
+existing Today Loop, details, local markers, close/reopen, encrypted relaunch,
+and reset flows. Nothing persists during Suggest, preview, dismiss, or apply.
 
 Reset local data, uninstalling ViharLoop, or clearing its app data removes the
 current local encryption key and records. Reset then restores only fictional
@@ -158,8 +179,10 @@ disabled for this local-only slice.
 The current slice does not yet include:
 
 - Exact-address detection beyond deterministic heuristics
-- A deterministic AI fallback
-- Gemma or another local model
+- Actual on-device Gemma integration
+- Model/runtime device benchmarking and timeout selection
+- Model licensing and download/distribution setup
+- Model-first/fallback coordination
 - Completion of the full manual TalkBack create/picker/progress/dialog pass
 - Manual VoiceOver verification
 - Full iOS runtime and Keychain verification

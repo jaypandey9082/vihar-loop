@@ -1,9 +1,9 @@
 # Demo script
 
-## Draft final three-minute demo
+## Final three-minute demo draft
 
-The non-AI product loop is implemented in Section 4. Draft Assist remains
-planned, so the complete-product demo is not yet claimed.
+The Section 7 Draft Assist path uses deterministic offline fallback. It does
+not require a model or hosted API.
 
 | Step | Demonstration | Section 4 status |
 | --- | --- | --- |
@@ -13,10 +13,26 @@ planned, so the complete-product demo is not yet claimed.
 | 4 | Open and read listing details | Implemented |
 | 5 | Save a listing or mark it contacted | Implemented |
 | 6 | Create a need or offer | Implemented |
-| 7 | Use editable local Draft Assist | Planned |
+| 7 | Use editable local Draft Assist | Implemented with deterministic fallback |
 | 8 | Relaunch and show persistence | Created record and state persist |
 | 9 | Close the created listing | Implemented for local-origin records |
-| 10 | Point to architecture, accessibility, and security evidence | Section 6 automated evidence is current |
+| 10 | Point to architecture, accessibility, and security evidence | Section 7 automated evidence is current |
+
+## Section 7 Draft Assist proof
+
+1. Enable airplane mode.
+2. Open Create and enter **Need a guitar capo for rehearsal near Somaiya
+   today.**
+3. Activate **Suggest type, title & category**.
+4. Show the Need, **Guitar capo for rehearsal**, **Music, hobbies & sports**,
+   and **Built-in offline rules** preview.
+5. Dismiss once and show that no form value was changed or saved.
+6. Suggest again and activate **Use suggestions**.
+7. Edit the Title slightly.
+8. Complete area, contact preference, and deadline manually.
+9. Post and show the listing in the feed.
+10. Point to `LocalAiService`, the 18-case deterministic evaluation, shared
+    validation, and the absence of model/network dependencies.
 
 ## Section 4 creation and Today Loop demonstration
 
@@ -40,8 +56,8 @@ planned, so the complete-product demo is not yet claimed.
 
 Do not inspect, display, or narrate the encryption key. The automated
 persistence test separately creates, closes, reopens, and reopens storage
-without changing the nine seeds, schema version 1, or seed version 1. Draft
-Assist, deterministic fallback, and Gemma remain planned.
+without changing the nine seeds, schema version 1, or seed version 1. Actual
+on-device Gemma integration remains planned for Section 8.
 
 ## Section 5 accessibility evidence
 

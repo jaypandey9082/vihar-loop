@@ -11,15 +11,18 @@ import 'package:vihar_loop/features/feed/feed_view_model.dart';
 import 'package:vihar_loop/features/feed/listing_card.dart';
 import 'package:vihar_loop/features/listing_details/listing_details_screen.dart';
 import 'package:vihar_loop/features/privacy_data/privacy_data_screen.dart';
+import 'package:vihar_loop/local_ai/local_ai_service.dart';
 
 class FeedScreen extends StatefulWidget {
   const FeedScreen({
     required this.repository,
+    required this.localAiService,
     this.clock = DateTime.now,
     super.key,
   });
 
   final ListingRepository repository;
+  final LocalAiService localAiService;
   final Clock clock;
 
   @override
@@ -81,6 +84,7 @@ class _FeedScreenState extends State<FeedScreen> {
       MaterialPageRoute<Listing>(
         builder: (context) => CreateListingScreen(
           repository: widget.repository,
+          localAiService: widget.localAiService,
           clock: widget.clock,
         ),
       ),

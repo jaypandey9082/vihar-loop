@@ -9,6 +9,7 @@ import 'package:vihar_loop/features/create_listing/create_listing_screen.dart';
 import 'package:vihar_loop/features/feed/feed_screen.dart';
 import 'package:vihar_loop/features/listing_details/listing_details_screen.dart';
 import 'package:vihar_loop/features/privacy_data/privacy_data_screen.dart';
+import 'package:vihar_loop/local_ai/rule_based_listing_assistant.dart';
 
 import '../support/accessibility_test_repository.dart';
 
@@ -29,6 +30,7 @@ void main() {
               darkTheme: AppTheme.dark,
               themeMode: mode,
               home: FeedScreen(
+                localAiService: const RuleBasedListingAssistant(),
                 repository: AccessibilityTestRepository(
                   listings: [
                     accessibilityListing(
@@ -65,7 +67,10 @@ void main() {
           listings: [accessibilityListing()],
         );
         await tester.pumpWidget(
-          ViharLoopApp(listingRepository: filtered, clock: () => _now),
+          ViharLoopApp(
+              localAiService: const RuleBasedListingAssistant(),
+              listingRepository: filtered,
+              clock: () => _now),
         );
         await tester.pumpAndSettle();
         tester.semantics.tap(find.semantics.byLabel('Offers'));
@@ -75,6 +80,7 @@ void main() {
         await tester.pumpWidget(const SizedBox());
         await tester.pumpWidget(
           ViharLoopApp(
+            localAiService: const RuleBasedListingAssistant(),
             listingRepository: AccessibilityTestRepository(),
             clock: () => _now,
           ),
@@ -85,6 +91,7 @@ void main() {
         await tester.pumpWidget(const SizedBox());
         await tester.pumpWidget(
           ViharLoopApp(
+            localAiService: const RuleBasedListingAssistant(),
             listingRepository: AccessibilityTestRepository(
               fetchFailure: StateError('hidden'),
             ),
@@ -107,6 +114,7 @@ void main() {
           MaterialApp(
             theme: AppTheme.light,
             home: CreateListingScreen(
+              localAiService: const RuleBasedListingAssistant(),
               repository: AccessibilityTestRepository(),
               clock: () => _now,
             ),
@@ -161,6 +169,7 @@ void main() {
         await tester.pumpWidget(
           MaterialApp(
             home: CreateListingScreen(
+              localAiService: const RuleBasedListingAssistant(),
               repository: createRepository,
               clock: () => _now,
             ),
@@ -306,6 +315,7 @@ void main() {
       await tester.pumpWidget(
         _scaledApp(
           FeedScreen(
+            localAiService: const RuleBasedListingAssistant(),
             repository: AccessibilityTestRepository(
               listings: [
                 accessibilityListing(
@@ -344,13 +354,23 @@ void main() {
         await tester.pumpWidget(
           _scaledApp(
             CreateListingScreen(
+              localAiService: const RuleBasedListingAssistant(),
               repository: AccessibilityTestRepository(),
               clock: () => _now,
             ),
           ),
         );
         await tester.pumpAndSettle();
-        await tester.drag(find.byType(ListView), const Offset(0, -3000));
+        final initialScrollable = tester.state<ScrollableState>(
+          find
+              .descendant(
+                of: find.byType(ListView),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        initialScrollable.position
+            .jumpTo(initialScrollable.position.maxScrollExtent);
         await tester.pumpAndSettle();
         await tester.tap(find.text('Post need'));
         await tester.pumpAndSettle();

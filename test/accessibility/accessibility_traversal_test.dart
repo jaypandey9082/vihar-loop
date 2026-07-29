@@ -5,6 +5,7 @@ import 'package:vihar_loop/app/vihar_loop_app.dart';
 import 'package:vihar_loop/domain/listing.dart';
 import 'package:vihar_loop/features/create_listing/create_listing_screen.dart';
 import 'package:vihar_loop/features/listing_details/listing_details_screen.dart';
+import 'package:vihar_loop/local_ai/rule_based_listing_assistant.dart';
 import 'package:vihar_loop/features/privacy_data/privacy_data_screen.dart';
 
 import '../support/accessibility_test_repository.dart';
@@ -20,6 +21,7 @@ void main() {
         await _setSurface(tester, const Size(411, 1200));
         await tester.pumpWidget(
           ViharLoopApp(
+            localAiService: const RuleBasedListingAssistant(),
             listingRepository: AccessibilityTestRepository(
               listings: [accessibilityListing()],
             ),
@@ -58,6 +60,7 @@ void main() {
         await _setSurface(tester, const Size(411, 1200));
         await tester.pumpWidget(
           ViharLoopApp(
+            localAiService: const RuleBasedListingAssistant(),
             listingRepository: AccessibilityTestRepository(
               listings: [accessibilityListing()],
             ),
@@ -94,6 +97,7 @@ void main() {
         await tester.pumpWidget(
           MaterialApp(
             home: CreateListingScreen(
+              localAiService: const RuleBasedListingAssistant(),
               repository: AccessibilityTestRepository(),
               clock: () => _now,
             ),
@@ -118,6 +122,8 @@ void main() {
             contains('What are you posting'),
             contains('Title'),
             contains('Description'),
+            contains('Draft Assist'),
+            contains('Suggest type, title & category'),
             contains('Category'),
             contains('Approximate area'),
             contains('Contact preference'),
@@ -241,6 +247,7 @@ void main() {
       await _setSurface(tester, const Size(411, 1000));
       await tester.pumpWidget(
         ViharLoopApp(
+          localAiService: const RuleBasedListingAssistant(),
           listingRepository: AccessibilityTestRepository(
             listings: [
               accessibilityListing(),
@@ -275,6 +282,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: CreateListingScreen(
+            localAiService: const RuleBasedListingAssistant(),
             repository: repository,
             clock: () => _now,
           ),

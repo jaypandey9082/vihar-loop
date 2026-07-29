@@ -9,11 +9,16 @@ import 'package:vihar_loop/app/vihar_loop_app.dart';
 import 'package:vihar_loop/domain/listing.dart';
 import 'package:vihar_loop/domain/listing_draft.dart';
 import 'package:vihar_loop/features/create_listing/create_listing_screen.dart';
+import 'package:vihar_loop/features/create_listing/create_listing_view_model.dart';
 import 'package:vihar_loop/features/feed/listing_card.dart';
 import 'package:vihar_loop/features/listing_details/listing_details_screen.dart';
 import 'package:vihar_loop/features/privacy_data/privacy_data_screen.dart';
+import 'package:vihar_loop/local_ai/listing_suggestion.dart';
+import 'package:vihar_loop/local_ai/local_ai_service.dart';
+import 'package:vihar_loop/local_ai/rule_based_listing_assistant.dart';
 
 import '../support/accessibility_test_repository.dart';
+import '../support/test_local_ai_service.dart';
 
 final _now = DateTime(2026, 7, 30, 12);
 
@@ -27,7 +32,10 @@ void main() {
 
       try {
         await tester.pumpWidget(
-          ViharLoopApp(listingRepository: repository, clock: () => _now),
+          ViharLoopApp(
+              localAiService: const RuleBasedListingAssistant(),
+              listingRepository: repository,
+              clock: () => _now),
         );
         await tester.pump();
 
@@ -63,7 +71,10 @@ void main() {
       try {
         await _setSurface(tester, const Size(411, 1000));
         await tester.pumpWidget(
-          ViharLoopApp(listingRepository: repository, clock: () => _now),
+          ViharLoopApp(
+              localAiService: const RuleBasedListingAssistant(),
+              listingRepository: repository,
+              clock: () => _now),
         );
         await tester.pumpAndSettle();
 
@@ -127,7 +138,10 @@ void main() {
       try {
         await _setSurface(tester, const Size(411, 1000));
         await tester.pumpWidget(
-          ViharLoopApp(listingRepository: repository, clock: () => _now),
+          ViharLoopApp(
+              localAiService: const RuleBasedListingAssistant(),
+              listingRepository: repository,
+              clock: () => _now),
         );
         await tester.pumpAndSettle();
 
@@ -153,6 +167,7 @@ void main() {
       try {
         await tester.pumpWidget(
           ViharLoopApp(
+            localAiService: const RuleBasedListingAssistant(),
             listingRepository: emptyRepository,
             clock: () => _now,
           ),
@@ -169,7 +184,10 @@ void main() {
         );
         await tester.pumpWidget(const SizedBox());
         await tester.pumpWidget(
-          ViharLoopApp(listingRepository: failed, clock: () => _now),
+          ViharLoopApp(
+              localAiService: const RuleBasedListingAssistant(),
+              listingRepository: failed,
+              clock: () => _now),
         );
         await tester.pumpAndSettle();
         _expectHeading(tester, 'Unable to load listings', 1);
@@ -199,6 +217,7 @@ void main() {
         for (final repository in repositories) {
           await tester.pumpWidget(
             ViharLoopApp(
+              localAiService: const RuleBasedListingAssistant(),
               listingRepository: repository,
               clock: () => _now,
             ),
@@ -333,6 +352,111 @@ void main() {
   });
 
   group('create semantics and focus', () {
+    testWidgets(
+        'Draft Assist exposes pending, preview, actions, failure, and apply focus',
+        (tester) async {
+      final semantics = tester.ensureSemantics();
+      final pending = Completer<ListingSuggestion>();
+      final service = TestLocalAiService(
+        result: const ListingSuggestion(
+          kind: ListingKind.offer,
+          title:
+              'A deliberately long but safe suggested title for a useful nearby item',
+          category: ListingCategory.other,
+          source: ListingSuggestionSource.deterministicFallback,
+        ),
+        pending: pending,
+      );
+      try {
+        await _setSurface(tester, const Size(800, 3000));
+        await _pumpCreate(
+          tester,
+          AccessibilityTestRepository(),
+          localAiService: service,
+        );
+        _expectHeadingContaining(tester, 'Draft Assist', 2);
+        expect(
+          _actionData(tester, 'Suggest type, title & category')
+              .hasAction(SemanticsAction.tap),
+          isTrue,
+        );
+        await tester.enterText(
+          find.byType(TextFormField).last,
+          'Offering one useful nearby item for a short while.',
+        );
+        tester.semantics.tap(
+          find.semantics.byLabel('Suggest type, title & category'),
+        );
+        await tester.pump();
+        final pendingData =
+            _data(tester, 'Suggesting type, title, and category');
+        expect(pendingData.flagsCollection.isLiveRegion, isTrue);
+        expect(pendingData.flagsCollection.isEnabled, Tristate.isFalse);
+
+        pending.complete(service.result);
+        await tester.pumpAndSettle();
+        _expectHeadingContaining(tester, 'Suggested details', 3);
+        expect(
+          find.semantics.byLabel('Source: Built-in offline rules').evaluate(),
+          hasLength(1),
+        );
+        expect(
+          _actionData(tester, 'Use suggestions').hasAction(SemanticsAction.tap),
+          isTrue,
+        );
+        expect(
+          _actionData(tester, 'Dismiss').hasAction(SemanticsAction.tap),
+          isTrue,
+        );
+        expect(
+          _data(
+            tester,
+            'Suggested type, title, and category are ready for review.',
+          ).flagsCollection.isLiveRegion,
+          isTrue,
+        );
+
+        tester.semantics.tap(find.semantics.byLabel('Use suggestions'));
+        await tester.pumpAndSettle();
+        final title = tester.widget<EditableText>(
+          find.descendant(
+            of: find
+                .byType(
+                  TextFormField,
+                  skipOffstage: false,
+                )
+                .first,
+            matching: find.byType(
+              EditableText,
+              skipOffstage: false,
+            ),
+          ),
+        );
+        expect(title.focusNode.hasFocus, isTrue);
+
+        service
+          ..pending = null
+          ..failure = StateError('technical detail');
+        await _showCreateText(tester, 'Description');
+        await tester.enterText(
+          find.byType(TextFormField).last,
+          'Offering another useful nearby item for a short while.',
+        );
+        await _showCreateText(tester, 'Suggest type, title & category');
+        tester.semantics.tap(
+          find.semantics.byLabel('Suggest type, title & category'),
+        );
+        await tester.pumpAndSettle();
+        final failure = _data(
+          tester,
+          CreateListingViewModel.suggestionFailureCopy,
+        );
+        expect(failure.flagsCollection.isLiveRegion, isTrue);
+      } finally {
+        semantics.dispose();
+      }
+    });
+
     testWidgets('heading and segmented control adapt without losing selection',
         (tester) async {
       final repository = AccessibilityTestRepository();
@@ -594,6 +718,19 @@ void _expectHeading(WidgetTester tester, String label, int level) {
   expect(data.headingLevel, level);
 }
 
+void _expectHeadingContaining(
+  WidgetTester tester,
+  String label,
+  int level,
+) {
+  final data = find.semantics
+      .byLabel(RegExp(RegExp.escape(label)))
+      .evaluate()
+      .map((element) => element.getSemanticsData())
+      .singleWhere((data) => data.flagsCollection.isHeader);
+  expect(data.headingLevel, level);
+}
+
 SemanticsData _actionData(WidgetTester tester, String label) {
   return find.semantics
       .byLabel(label)
@@ -612,6 +749,7 @@ Future<void> _pumpCreate(
   WidgetTester tester,
   AccessibilityTestRepository repository, {
   TextScaler textScaler = TextScaler.noScaling,
+  LocalAiService localAiService = const RuleBasedListingAssistant(),
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -620,6 +758,7 @@ Future<void> _pumpCreate(
         child: child!,
       ),
       home: CreateListingScreen(
+        localAiService: localAiService,
         repository: repository,
         clock: () => _now,
       ),

@@ -107,6 +107,16 @@ The release remains permission-minimal and has no product network permission.
 Screenshot blocking remains deliberately deferred because the current product
 has no credentials, payments, medical record, or private chat.
 
+Draft Assist is an independent presentation boundary:
+`CreateListingViewModel` depends on `LocalAiService`, while storage and
+`ListingRepository` remain unaware of suggestions or their source.
+`ListingSuggestion` contains only three editable values—Kind, Title, and
+Category—plus a transient display source. Input Description and output Title
+reuse existing validation. Results are previewed before explicit application
+and may never persist directly. Section 7 supplies deterministic offline
+fallback; Section 8 may add a model provider behind the same boundary. No
+model-specific timeout is selected before real device measurement.
+
 ## Alternatives considered
 
 - **In-memory fallback after failure:** rejected because it would hide
@@ -151,8 +161,7 @@ Future mutations should continue to add only workflow-backed methods. Schema or 
 migrations at the codec/store boundary. A backend would reverse local-only
 trust, backup, and telemetry assumptions and requires a new ADR.
 
-Future Draft Assist may create an editable `ListingDraft`, but it and any
-deterministic fallback must pass `ListingPrivacyValidator` and the repository
-path and can never persist directly. A future backend must also replace the
-current local-origin ownership assumption with authenticated,
+Future on-device model results must pass the same preview, validation, and
+explicit Post path as Section 7 fallback. A future backend must also replace
+the current local-origin ownership assumption with authenticated,
 server-authoritative validation and authorization.

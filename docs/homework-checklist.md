@@ -44,10 +44,14 @@ Statuses mean:
 | Seed relaunch persistence | Section 2 | Encrypted store persistence test | Done | Nine records and clock-A timestamps survive close/reopen |
 | Android force-stop persistence | Section 2 | API 36 emulator | Done | Nine records and the noted 4:47 AM deadline survived force-stop/relaunch; details reopened |
 | Local storage documentation | Section 2 | `docs/local-storage-note.md` | Done | Names, versions, failures, backup, and limits documented |
-| Local AI helper | Later | Draft Assist | Planned | Documented only |
-| `LocalAiService` boundary | Later | Local AI feature | Planned | Architecture recorded; no placeholder class |
-| Deterministic fallback | Later | Local AI feature | Planned | Required behaviour documented |
-| Local model or fallback expected flow | Later | Draft Assist integration tests | Planned | No model or fallback in Section 2 |
+| Local AI helper | Section 7 | Draft Assist UI and view model | Done | Preview, dismiss, explicit application, editability, failure, automated workflow, and API 36 airplane-mode flow pass |
+| `LocalAiService` boundary | Section 7 | `lib/local_ai/` and constructor injection | Done | UI depends on the interface; production fallback is injected from `main.dart` |
+| Deterministic fallback | Section 7 | `RuleBasedListingAssistant` | Done | 18 required evaluation cases, 15 invalid classes, and 10/10 determinism pass |
+| Local model or fallback expected flow | Section 7–8 | Draft Assist workflow | Done using fallback | Expected guitar-capo flow works through fallback in tests and on API 36 with airplane mode; actual local model remains Planned for Section 8 |
+| Editable Draft Assist output | Section 7 | Create preview and form | Done | Apply changes only Type, Title, Category; values remain editable and Post remains explicit |
+| No hosted AI key | Section 7 | Production/repository audit | Done | No hosted client, secret, network, permission, model, or dependency added |
+| AI privacy validation | Section 7 | Shared validators | Done | Description input and suggested Title output reuse `ListingDraftValidator`; API 36 rejects a precise-location draft without preview |
+| Gemma | Section 8 | Future `LocalAiService` provider | Planned | No model path or inference is claimed in Section 7 |
 | Repository/data-source boundary | Section 1–3 | `lib/data/listing_repository.dart`, `lib/data/local/` | Done | UI uses explicit product operations and has no Hive imports |
 | ADR | Section 1–2 | `docs/adr/0001-local-first-marketplace-slice.md` | Done | Accepted storage decision and trade-offs recorded |
 | Product document | Section 1 | `docs/product-slice.md` | Done | Target, boundary, workflow, scope recorded |
@@ -56,20 +60,21 @@ Statuses mean:
 | Release permissions | Section 6 | Release APK/merged manifest audit | Done | `apkanalyzer`/`aapt` show no product INTERNET or unnecessary sensitive permission; exported components reviewed |
 | Logging/plaintext audit | Section 6 | Production scan, logcat/raw-Hive checks | Done | No production logging boundary; automated ciphertext/canary reset regressions pass; dynamic evidence limits documented |
 | Security document | Section 1–6 | `docs/security-baseline.md` | Done | Data inventory, decisions, validation, reset, release, leakage, supply-chain, and residual-risk evidence current |
-| Local-AI document | Section 1 | `docs/local-ai-note.md` | Done | Clearly marked not implemented |
-| README | Section 1–6 | `README.md` | Done | Section 6 privacy, reset, release audit, and honest gaps included |
-| Three-minute demo | Draft in Section 1; final later | `docs/demo-script.md` | Implemented, verification pending | Non-AI Section 4 flow works; final demo still lacks Draft Assist |
-| Fresh checkout | Section 6 gate | README commands and a clean clone | Done | Committed-history clone passes setup, analysis, 246 tests, 38 accessibility tests, and Android debug/release builds |
+| Local-AI document | Section 7 | `docs/local-ai-note.md` | Done | Current fallback boundary, algorithm, validation, evidence, and Section 8 point documented |
+| README | Section 1–7 | `README.md` | Done | Section 7 behaviour, offline boundary, and honest model gaps included |
+| Three-minute demo | Section 7 draft | `docs/demo-script.md` | Implemented, verification pending | Draft Assist fallback steps are included; two timed human runs remain pending |
+| Fresh checkout | Section 7 gate | README commands and a clean clone | Done | Isolated committed-history clone passes setup, analysis, 311 tests, 39 accessibility tests, and Android debug/release builds |
 | Clean repository | Section 6 gate | `.gitignore`, `git status`, `git diff --check` | Done | Staged-file, generated-data, local-path, dependency, and secret-pattern audits pass |
 
 ## Current verification snapshot
 
-Flutter 3.44.8 and Dart 3.12.2 are installed. Section 6 formatting, analysis,
-246 unit/widget tests, the 38-test accessibility subset, and Android
+Flutter 3.44.8 and Dart 3.12.2 are installed. Section 7 formatting, analysis,
+311 unit/widget tests, the 39-test accessibility subset, and Android
 debug/release builds pass. Official guidelines report no failures in tested
 target, label, contrast, and scaled layout states.
 
 Android XML and iOS source plists validate. Full Xcode, VoiceOver, Accessibility
 Scanner, and completion of the full TalkBack script remain pending.
-Local AI, `LocalAiService`, deterministic fallback, and Gemma remain Planned;
-the complete MAL homework is not claimed finished.
+Draft Assist, `LocalAiService`, and deterministic fallback are implemented.
+Actual Gemma, the complete human-driven TalkBack flow, VoiceOver, full iOS
+runtime, and remaining later-section work are not claimed finished.

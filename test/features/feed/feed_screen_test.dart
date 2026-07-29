@@ -8,13 +8,66 @@ import 'package:vihar_loop/domain/listing.dart';
 import 'package:vihar_loop/domain/listing_draft.dart';
 import 'package:vihar_loop/features/feed/feed_screen.dart';
 import 'package:vihar_loop/features/feed/feed_view_model.dart';
+import 'package:vihar_loop/local_ai/rule_based_listing_assistant.dart';
+
+import '../../support/test_local_ai_service.dart';
 
 void main() {
+  testWidgets('app injects one service through feed into create only',
+      (tester) async {
+    final service = TestLocalAiService();
+    final repository = _SequenceRepository([
+      [_testListing()],
+    ]);
+    await tester.pumpWidget(
+      ViharLoopApp(
+        localAiService: service,
+        listingRepository: repository,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(service.requests, isEmpty);
+
+    await _showFeedListing(tester, 'USB-C laptop charger for two hours');
+    await tester.tap(find.text('USB-C laptop charger for two hours'));
+    await tester.pumpAndSettle();
+    expect(service.requests, isEmpty);
+    await tester.tap(find.byIcon(Icons.arrow_back));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Post a need or offer'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byType(TextFormField).last,
+      'Need a guitar capo for rehearsal near Somaiya today.',
+    );
+    await tester.scrollUntilVisible(
+      find.text('Suggest type, title & category'),
+      250,
+      scrollable: find
+          .descendant(
+            of: find.byType(ListView),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Suggest type, title & category'));
+    await tester.pumpAndSettle();
+
+    expect(service.requests, hasLength(1));
+    expect(
+      service.requests.single.description,
+      'Need a guitar capo for rehearsal near Somaiya today.',
+    );
+  });
+
   testWidgets('shows a genuine loading state while the repository is pending',
       (tester) async {
     final pending = Completer<List<Listing>>();
     await tester.pumpWidget(
       ViharLoopApp(
+        localAiService: const RuleBasedListingAssistant(),
         listingRepository: _PendingRepository(pending.future),
       ),
     );
@@ -30,6 +83,7 @@ void main() {
   testWidgets('shows product, neighborhood, and listing cards', (tester) async {
     await tester.pumpWidget(
       ViharLoopApp(
+        localAiService: const RuleBasedListingAssistant(),
         listingRepository: _SequenceRepository([
           [
             _testListing(),
@@ -60,6 +114,7 @@ void main() {
       (tester) async {
     await tester.pumpWidget(
       ViharLoopApp(
+        localAiService: const RuleBasedListingAssistant(),
         listingRepository: _SequenceRepository([
           [_testListing()],
         ]),
@@ -96,7 +151,9 @@ void main() {
       [_testListing()],
     ]);
     await tester.pumpWidget(
-      ViharLoopApp(listingRepository: repository),
+      ViharLoopApp(
+          localAiService: const RuleBasedListingAssistant(),
+          listingRepository: repository),
     );
     await tester.pumpAndSettle();
 
@@ -130,6 +187,7 @@ void main() {
     try {
       await tester.pumpWidget(
         ViharLoopApp(
+          localAiService: const RuleBasedListingAssistant(),
           listingRepository: _SequenceRepository([
             [
               _testListing(
@@ -163,6 +221,7 @@ void main() {
   testWidgets('empty state is readable', (tester) async {
     await tester.pumpWidget(
       ViharLoopApp(
+        localAiService: const RuleBasedListingAssistant(),
         listingRepository: _SequenceRepository([
           const <Listing>[],
         ]),
@@ -183,7 +242,9 @@ void main() {
       [_testListing()],
     ]);
     await tester.pumpWidget(
-      ViharLoopApp(listingRepository: repository),
+      ViharLoopApp(
+          localAiService: const RuleBasedListingAssistant(),
+          listingRepository: repository),
     );
     await tester.pumpAndSettle();
 
@@ -203,6 +264,7 @@ void main() {
     try {
       await tester.pumpWidget(
         ViharLoopApp(
+          localAiService: const RuleBasedListingAssistant(),
           listingRepository: _SequenceRepository([
             [_testListing()],
           ]),
@@ -238,6 +300,7 @@ void main() {
           );
         },
         home: FeedScreen(
+          localAiService: const RuleBasedListingAssistant(),
           repository: _SequenceRepository([
             [_testListing()],
           ]),
@@ -258,6 +321,7 @@ void main() {
     ]);
     await tester.pumpWidget(
       ViharLoopApp(
+        localAiService: const RuleBasedListingAssistant(),
         listingRepository: repository,
         clock: () => now,
       ),
@@ -335,7 +399,9 @@ void main() {
       ],
     ]);
     await tester.pumpWidget(
-      ViharLoopApp(listingRepository: repository),
+      ViharLoopApp(
+          localAiService: const RuleBasedListingAssistant(),
+          listingRepository: repository),
     );
     await tester.pumpAndSettle();
 
@@ -357,7 +423,9 @@ void main() {
     final repository = _SequenceRepository([
       [original],
     ]);
-    await tester.pumpWidget(ViharLoopApp(listingRepository: repository));
+    await tester.pumpWidget(ViharLoopApp(
+        localAiService: const RuleBasedListingAssistant(),
+        listingRepository: repository));
     await tester.pumpAndSettle();
 
     expect(find.text('Privacy & data'), findsOneWidget);
@@ -389,7 +457,9 @@ void main() {
       ],
       resetResult: resetSamples,
     );
-    await tester.pumpWidget(ViharLoopApp(listingRepository: repository));
+    await tester.pumpWidget(ViharLoopApp(
+        localAiService: const RuleBasedListingAssistant(),
+        listingRepository: repository));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Offers'));
     await tester.pump();
@@ -415,7 +485,9 @@ void main() {
         [response],
         resetResult: _resetSamples(),
       );
-      await tester.pumpWidget(ViharLoopApp(listingRepository: repository));
+      await tester.pumpWidget(ViharLoopApp(
+          localAiService: const RuleBasedListingAssistant(),
+          listingRepository: repository));
       await tester.pumpAndSettle();
 
       expect(find.text('Privacy & data'), findsOneWidget);

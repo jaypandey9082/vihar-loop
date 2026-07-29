@@ -1,9 +1,15 @@
 # Security and privacy evidence
 
-Section 6 remains a local-only product: there is no backend, application
+Section 7 remains a local-only product: there is no backend, application
 network client, authentication, analytics, crash reporting, remote logging, or
 hosted-service secret. This is reviewable engineering evidence, not MASVS,
 OWASP, privacy, or security certification.
+
+Draft Assist adds no network client, hosted API, model key, model file, model
+runtime, permission, or dependency. It validates Description input and
+suggested Title output with the existing validators, logs and caches neither,
+keeps suggestions transient, and cannot call storage. Final repository
+validation still runs before persistence.
 
 ## Data inventory
 
@@ -162,7 +168,7 @@ log UI content or a formal cryptographic audit.
 | `hive_ce_flutter` | 2.3.4 | Flutter path/init adapter for Hive; no user transport |
 | `flutter_secure_storage` | 10.3.1 | Platform storage for only the database key; platform native code, no product permission |
 
-Section 6 adds or upgrades no dependency and leaves `pubspec.lock`
+Section 7 adds or upgrades no dependency and leaves `pubspec.lock`
 semantically unchanged. `dart pub outdated` reported direct dependencies
 current under the existing constraints; some transitive updates exist and
 were deliberately not applied. This is a focused inventory, not

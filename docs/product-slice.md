@@ -23,6 +23,7 @@ The currently implemented core workflow is:
 
 ```text
 Feed → create → encrypted persistence → details
+     → optional Draft Assist preview → explicit apply/edit
      → save/contact/close/reopen → relaunch
      → Privacy & data → reset → fictional samples
 ```
@@ -49,6 +50,16 @@ time. Today Loop is implemented in the feed:
 Closed and past listings remain visible under All but are excluded from Today
 and Ending Soon. Cards show at most one time badge, prioritizing Ending soon
 over Today.
+
+## Optional Draft Assist
+
+Draft Assist uses the Description to suggest only Type, Title, and Category.
+Section 7 runs deterministic built-in offline rules through `LocalAiService`.
+The result is previewed with its source before application, can be dismissed
+without changing the form, remains editable after application, and never
+posts automatically. The person can ignore it and complete the same manual
+form. Today Loop remains the personal product feature; Draft Assist only
+reduces create-form repetition.
 
 ## Creation and privacy boundary
 
